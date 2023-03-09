@@ -1,6 +1,8 @@
 mod chip;
 
 fn main() {
-    let chip = chip::Chip::new();
-    println!("Mem length: {:?}", chip.memory.len());
+    let mut chip = chip::Chip::new();
+    println!("Delay Timer: {:?}", chip.delay_timer.get());
+    chip.delay_timer.set(40);
+    println!("Delay Timer: {:?}", chip.delay_timer.get());
 }
