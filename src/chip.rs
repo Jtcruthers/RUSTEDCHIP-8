@@ -40,6 +40,22 @@ impl Chip {
             sound_timer: Timer::new()
         }
     }
+
+    fn fetch(&self) { }
+    fn decode(&self) { }
+    fn execute(&self) { }
+
+    pub fn step(&self) {
+        self.fetch();
+        self.decode();
+        self.execute();
+    }
+
+    pub fn run(&self) {
+        loop {
+            self.step()
+        }
+    }
 }
 
 #[cfg(test)]
