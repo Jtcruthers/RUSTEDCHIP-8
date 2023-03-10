@@ -60,12 +60,14 @@ impl Chip {
         self.display = [false; DISPLAY_SIZE];
     }
 
+    // TODO - figure out how functions will work with stack
     fn handle_return(&self) { }
 
     fn jump(&mut self, address: u16) {
         self.pc = address
     }
 
+    // TODO - figure out how functions will work with stack
     fn call_at(&mut self, address: u16) { }
 
     fn skip_if_eq(&mut self, x: u8, y:u8) {
@@ -85,9 +87,21 @@ impl Chip {
         self.registers[x as usize] = rand_number & seed;
     }
 
-    fn store_least_sig_vx_bit(&mut self, x: u8, y:u8) { }
+    fn store_least_sig_vx_bit(&mut self, x: u8) {
+        let vx = self.registers[x as usize];
+        let lsb = vx & 1;
 
-    fn store_most_sig_vx_bit(&mut self, x: u8, y:u8) { }
+        self.registers[0xF] = lsb;
+        self.registers[x as usize] = vx >> 1;
+    }
+
+    fn store_most_sig_vx_bit(&mut self, x: u8) {
+        let vx = self.registers[x as usize];
+        let msb = (vx >> 7) & 1;
+
+        self.registers[0xF] = msb;
+        self.registers[x as usize] = vx << 1;
+    }
 
     fn set_i_location_of_vx_character_sprite(&mut self, x: u8) { }
 
@@ -167,9 +181,9 @@ impl Chip {
             [8, x, y, 3] => self.registers[x as usize] = self.registers[x as usize] ^ self.registers[y as usize],
             [8, x, y, 4] => self.registers[x as usize] = self.registers[x as usize] + self.registers[y as usize],
             [8, x, y, 5] => self.registers[x as usize] = self.registers[x as usize] - self.registers[y as usize],
-            [8, x, y, 6] => self.store_least_sig_vx_bit(x, y),
+            [8, x, _, 6] => self.store_least_sig_vx_bit(x),
             [8, x, y, 7] => self.registers[x as usize] = self.registers[y as usize] - self.registers[x as usize],
-            [8, x, y, 0xE] => self.store_most_sig_vx_bit(x, y),
+            [8, x, _, 0xE] => self.store_most_sig_vx_bit(x),
             [9, x, y, 0] => self.skip_if_not_eq(x, self.registers[y as usize]),
             [0xA, _, _, _] => self.i = decoded_instruction.nnn,
             [0xB, _, _, _] => self.pc = self.registers[0] as u16 + decoded_instruction.nnn,
@@ -320,5 +334,53 @@ mod tests {
         assert_eq!(chip.memory[0], 0x0);
         assert_eq!(chip.memory[1], 0x0);
         assert_eq!(chip.memory[2], 0x0);
+    }
+
+    #[test]
+    fn store_most_sig_vx_bit_1() {
+        let mut chip = Chip::new();
+        chip.registers[8] = 0b10000001;
+
+        assert_eq!(chip.registers[0xF], 0);
+
+        chip.store_most_sig_vx_bit(8);
+
+        assert_eq!(chip.registers[0x8], 0b00000010);
+        assert_eq!(chip.registers[0xF], 1);
+    }
+
+    #[test]
+    fn store_most_sig_vx_bit_0() {
+        let mut chip = Chip::new();
+        chip.registers[8] = 0b01111111;
+
+        chip.store_most_sig_vx_bit(8);
+
+        assert_eq!(chip.registers[0x8], 0b11111110);
+        assert_eq!(chip.registers[0xF], 0);
+    }
+
+    #[test]
+    fn store_least_sig_vx_bit_1() {
+        let mut chip = Chip::new();
+        chip.registers[0xA] = 0b11111101;
+
+        assert_eq!(chip.registers[0xF], 0);
+
+        chip.store_least_sig_vx_bit(0xA);
+
+        assert_eq!(chip.registers[0xA], 0b01111110);
+        assert_eq!(chip.registers[0xF], 1);
+    }
+
+    #[test]
+    fn store_least_sig_vx_bit_0() {
+        let mut chip = Chip::new();
+        chip.registers[0xB] = 0b10000010;
+
+        chip.store_least_sig_vx_bit(0xB);
+
+        assert_eq!(chip.registers[0xB], 0b01000001);
+        assert_eq!(chip.registers[0xF], 0);
     }
 }
