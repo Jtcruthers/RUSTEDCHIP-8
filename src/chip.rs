@@ -44,19 +44,15 @@ impl Chip {
     }
 
     fn fetch(&mut self) -> u16 {
-        let first_byte = self.memory[self.pc as usize];
-        let second_byte = self.memory[1 + self.pc as usize];
+        let first_byte = self.memory[self.pc as usize] as u16;
+        let second_byte = self.memory[1 + self.pc as usize] as u16;
 
-        let shifted_first_byte = (first_byte as u16) << 8;
-        println!("first_byte: {:X}", first_byte);
-        println!("shifted first_byte: {:X}", shifted_first_byte);
-        println!("second_byte: {:X}", second_byte);
-
-        let combined_bytes: u16 = shifted_first_byte + (second_byte as u16);
+        let shifted_first_byte = first_byte << 8; // 0xAB becomes 0xAB00
+        let combined_bytes = shifted_first_byte + second_byte;
 
         self.pc = self.pc + 2;
 
-        combined_bytes 
+        combined_bytes
     }
 
     fn decode(&self) { }
