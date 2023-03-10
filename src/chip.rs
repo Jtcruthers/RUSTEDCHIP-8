@@ -27,7 +27,8 @@ pub struct Chip {
     pub stack: [u16; 32],
     pub display: [bool; DISPLAY_SIZE],
     pub delay_timer: Timer,
-    pub sound_timer: Timer
+    pub sound_timer: Timer,
+    pub pc: u16
 }
 
 impl Chip {
@@ -37,21 +38,37 @@ impl Chip {
             stack: [0; 32],
             display: [false; DISPLAY_SIZE],
             delay_timer: Timer::new(),
-            sound_timer: Timer::new()
+            sound_timer: Timer::new(),
+            pc: 0
         }
     }
 
-    fn fetch(&self) { }
+    fn fetch(&mut self) -> u16 {
+        let first_byte = self.memory[self.pc as usize];
+        let second_byte = self.memory[1 + self.pc as usize];
+
+        let shifted_first_byte = (first_byte as u16) << 8;
+        println!("first_byte: {:X}", first_byte);
+        println!("shifted first_byte: {:X}", shifted_first_byte);
+        println!("second_byte: {:X}", second_byte);
+
+        let combined_bytes: u16 = shifted_first_byte + (second_byte as u16);
+
+        self.pc = self.pc + 2;
+
+        combined_bytes 
+    }
+
     fn decode(&self) { }
     fn execute(&self) { }
 
-    pub fn step(&self) {
+    pub fn step(&mut self) {
         self.fetch();
         self.decode();
         self.execute();
     }
 
-    pub fn run(&self) {
+    pub fn run(&mut self) {
         loop {
             self.step()
         }
@@ -97,4 +114,29 @@ mod tests {
         delay_timer.set(255);
         assert_eq!(delay_timer.get(), 255);
     }
+
+
+    #[test]
+    fn fetch_gets_two_byte_instruction_at_pc() {
+        let mut chip = Chip::new();
+        chip.pc = 30;
+
+        chip.memory[30] = 0xAB;
+        chip.memory[31] = 0xCD;
+
+        let instruction = chip.fetch();
+
+        assert_eq!(instruction, 0xABCD);
+    }
+
+    #[test]
+    fn fetch_increments_pc_by_2() {
+        let mut chip = Chip::new();
+        chip.pc = 30;
+
+        chip.fetch();
+
+        assert_eq!(chip.pc, 32);
+    }
+
 }

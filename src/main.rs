@@ -1,7 +1,7 @@
 mod chip;
 
 fn main() {
-    let chip = chip::Chip::new();
+    let mut chip = chip::Chip::new();
 
     chip.run()
 }
