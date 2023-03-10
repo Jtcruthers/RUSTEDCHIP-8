@@ -34,6 +34,7 @@ pub struct Chip {
     pub stack: [u16; 32],
     pub display: [bool; DISPLAY_SIZE],
     pub registers: [u8; 16],
+    pub i: u16,
     pub delay_timer: Timer,
     pub sound_timer: Timer,
     pub pc: u16
@@ -46,6 +47,7 @@ impl Chip {
             stack: [0; 32],
             display: [false; DISPLAY_SIZE],
             registers: [0; 16],
+            i: 0,
             delay_timer: Timer::new(),
             sound_timer: Timer::new(),
             pc: 0
@@ -54,6 +56,58 @@ impl Chip {
 
     fn reset_display(&mut self) {
         self.display = [false; DISPLAY_SIZE];
+    }
+
+    fn handle_return(&self) { }
+
+    fn jump(&mut self, address: u16) {
+        self.pc = address
+    }
+
+    fn call_at(&mut self, address: u16) { }
+
+    fn skip_if_eq(&mut self, x: u8, y:u8) {
+        if x == y {
+            self.pc += 1
+        }
+    }
+
+    fn skip_if_not_eq(&mut self, x: u8, y:u8) {
+        if x != y {
+            self.pc += 1
+        }
+    }
+
+    fn set_vx_rand(&mut self, x: u8, seed: u8) { }
+
+    fn store_least_sig_vx_bit(&mut self, x: u8, y:u8) { }
+
+    fn store_most_sig_vx_bit(&mut self, x: u8, y:u8) { }
+
+    fn set_i_location_of_vx_character_sprite(&mut self, x: u8) { }
+
+    fn draw(&mut self, x: u8, y:u8, n: u8) { }
+
+    fn skip_if_key_press(&mut self, x: u8) { }
+
+    fn skip_if_not_key_press(&mut self, x: u8) { }
+
+    fn await_then_store_keypress(&mut self, x: u8) { }
+
+    fn store_vx_binary_at_i(&mut self, x: u8) { }
+
+    fn store_registers_to_i(&mut self, x: u8) {
+        for register in 0..x {
+            let address = (self.i + register as u16) as usize;
+            self.memory[address] = self.registers[register as usize];
+        }
+    }
+
+    fn load_registers_to_i(&mut self, x: u8) {
+        for register in 0..x {
+            let address = (self.i + register as u16) as usize;
+            self.registers[register as usize] = self.memory[address]
+        }
     }
 
     fn fetch(&mut self) -> u16 {
@@ -81,76 +135,6 @@ impl Chip {
         DecodedInstruction { nibbles, nn, nnn }
     }
 
-    fn handle_return(&self) { }
-
-    fn jump(&mut self, address: u16) {
-        self.pc = address
-    }
-
-    fn call_at(&mut self, address: u16) { }
-
-    fn skip_if_eq(&mut self, x: u8, y:u8) {
-        if x == y {
-            self.pc += 1
-        }
-    }
-
-    fn skip_if_not_eq(&mut self, x: u8, y:u8) {
-        if x != y {
-            self.pc += 1
-        }
-    }
-
-    fn set_vx(&mut self, register_address: u8, value: u8) { }
-
-    fn add_nn_to_vx(&mut self, register_address: u8, value: u8) { }
-
-    fn set_vx_to_vy(&mut self, x: u8, y:u8) { }
-
-    fn set_vx_OR_vy(&mut self, x: u8, y:u8) { }
-
-    fn set_vx_AND_vy(&mut self, x: u8, y:u8) { }
-
-    fn set_vx_XOR_vy(&mut self, x: u8, y:u8) { }
-
-    fn set_vx_rand(&mut self, x: u8, seed: u8) { }
-
-    fn vx_add_vy(&mut self, x: u8, y:u8) { }
-
-    fn vx_subtract_vy(&mut self, x: u8, y:u8) { }
-
-    fn vy_subtract_vx(&mut self, x: u8, y:u8) { }
-
-    fn store_least_sig_vx_bit(&mut self, x: u8, y:u8) { }
-
-    fn store_most_sig_vx_bit(&mut self, x: u8, y:u8) { }
-
-    fn set_i_to_address(&mut self, address: u16) { }
-
-    fn set_i_location_of_vx_character_sprite(&mut self, x: u8) { }
-
-    fn draw(&mut self, x: u8, y:u8, n: u8) { }
-
-    fn jump_to_address_plus_v0(&mut self, address: u16) { }
-
-    fn set_vx_to_timer(&mut self, x: u8) { }
-
-    fn set_timer_to_vx(&mut self, use_delay: bool, x: u8) { }
-
-    fn skip_if_key_press(&mut self, x: u8) { }
-
-    fn skip_if_not_key_press(&mut self, x: u8) { }
-
-    fn await_then_store_keypress(&mut self, x: u8) { }
-
-    fn add_vx_to_i(&mut self, x: u8) { }
-
-    fn store_vx_binary_at_i(&mut self, x: u8) { }
-
-    fn store_registers_to_i(&mut self, x: u8) { }
-
-    fn load_registers_to_i(&mut self, x: u8) { }
-
     fn execute(&mut self, decoded_instruction: DecodedInstruction) {
         match decoded_instruction.nibbles {
             [0, 0, 0xE, 0xE] => self.reset_display(),
@@ -160,30 +144,30 @@ impl Chip {
             [2, _, _, _] => self.call_at(decoded_instruction.nnn),
             [3, x, _, _] => self.skip_if_eq(x, decoded_instruction.nn),
             [4, x, _, _] => self.skip_if_not_eq(x, decoded_instruction.nn),
-            [5, x, y, 0] => self.skip_if_eq(x, y),
-            [6, x, _, _] => self.set_vx(x, decoded_instruction.nn),
-            [7, x, _, _] => self.add_nn_to_vx(x, decoded_instruction.nn),
-            [8, x, y, 0] => self.set_vx_to_vy(x, y),
-            [8, x, y, 1] => self.set_vx_OR_vy(x, y),
-            [8, x, y, 2] => self.set_vx_AND_vy(x, y),
-            [8, x, y, 3] => self.set_vx_XOR_vy(x, y),
-            [8, x, y, 4] => self.vx_add_vy(x, y),
-            [8, x, y, 5] => self.vx_subtract_vy(x, y),
+            [5, x, y, 0x0] => self.skip_if_eq(x, self.registers[y as usize]),
+            [6, x, _, _] => self.registers[x as usize] = decoded_instruction.nn,
+            [7, x, _, _] => self.registers[x as usize] += decoded_instruction.nn,
+            [8, x, y, 0] => self.registers[x as usize] = self.registers[y as usize],
+            [8, x, y, 1] => self.registers[x as usize] = self.registers[x as usize] | self.registers[y as usize],
+            [8, x, y, 2] => self.registers[x as usize] = self.registers[x as usize] & self.registers[y as usize],
+            [8, x, y, 3] => self.registers[x as usize] = self.registers[x as usize] ^ self.registers[y as usize],
+            [8, x, y, 4] => self.registers[x as usize] = self.registers[x as usize] + self.registers[y as usize],
+            [8, x, y, 5] => self.registers[x as usize] = self.registers[x as usize] - self.registers[y as usize],
             [8, x, y, 6] => self.store_least_sig_vx_bit(x, y),
-            [8, x, y, 7] => self.vy_subtract_vx(x, y),
+            [8, x, y, 7] => self.registers[x as usize] = self.registers[y as usize] - self.registers[x as usize],
             [8, x, y, 0xE] => self.store_most_sig_vx_bit(x, y),
-            [9, x, y, 0] => self.skip_if_not_eq(x, y),
-            [0xA, _, _, _] => self.set_i_to_address(decoded_instruction.nnn),
-            [0xB, _, _, _] => self.jump_to_address_plus_v0(decoded_instruction.nnn),
+            [9, x, y, 0] => self.skip_if_not_eq(x, self.registers[y as usize]),
+            [0xA, _, _, _] => self.i = decoded_instruction.nnn,
+            [0xB, _, _, _] => self.pc = self.registers[0] as u16 + decoded_instruction.nnn,
             [0xC, x, _, _] => self.set_vx_rand(x, decoded_instruction.nn),
             [0xD, x, y, n] => self.draw(x, y, n),
             [0xE, x, 0x9, 0xE] => self.skip_if_key_press(x),
             [0xE, x, 0xA, 0x1] => self.skip_if_not_key_press(x),
-            [0xF, x, 0x0, 0x7] => self.set_vx_to_timer(x),
+            [0xF, x, 0x0, 0x7] => self.registers[x as usize] = self.delay_timer.get(),
             [0xF, x, 0x0, 0xA] => self.await_then_store_keypress(x),
-            [0xF, x, 0x1, 0x5] => self.set_timer_to_vx(true, x),
-            [0xF, x, 0x1, 0x8] => self.set_timer_to_vx(false, x),
-            [0xF, x, 0x1, 0xE] => self.add_vx_to_i(x),
+            [0xF, x, 0x1, 0x5] => self.delay_timer.set(self.registers[x as usize]),
+            [0xF, x, 0x1, 0x8] => self.sound_timer.set(self.registers[x as usize]),
+            [0xF, x, 0x1, 0xE] => self.i += self.registers[x as usize] as u16,
             [0xF, x, 0x2, 0x9] => self.set_i_location_of_vx_character_sprite(x),
             [0xF, x, 0x3, 0x3] => self.store_vx_binary_at_i(x),
             [0xF, x, 0x5, 0x5] => self.store_registers_to_i(x),
