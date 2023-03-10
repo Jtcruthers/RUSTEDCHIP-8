@@ -1,3 +1,5 @@
+use rand::Rng;
+
 #[derive(Debug)]
 pub struct Timer {
     value: u8
@@ -78,7 +80,10 @@ impl Chip {
         }
     }
 
-    fn set_vx_rand(&mut self, x: u8, seed: u8) { }
+    fn set_vx_rand(&mut self, x: u8, seed: u8) {
+        let rand_number = rand::thread_rng().gen_range(0..255);
+        self.registers[x as usize] = rand_number & seed;
+    }
 
     fn store_least_sig_vx_bit(&mut self, x: u8, y:u8) { }
 
