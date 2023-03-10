@@ -132,7 +132,39 @@ impl Chip {
 
     fn skip_if_not_key_press(&mut self, x: u8) { }
 
-    fn await_then_store_keypress(&mut self, x: u8) { }
+    fn keypress_to_value(&self, keypress: String) -> u8 {
+        println!("WAIT WHAT IS THIS: {}", keypress.trim());
+        match keypress.trim() {
+            "0" => 0x0,
+            "1" => 0x1,
+            "2" => 0x2,
+            "3" => 0x3,
+            "4" => 0x4,
+            "5" => 0x5,
+            "6" => 0x6,
+            "7" => 0x7,
+            "8" => 0x8,
+            "9" => 0x9,
+            "a" => 0xA,
+            "b" => 0xB,
+            "c" => 0xC,
+            "d" => 0xD,
+            "e" => 0xE,
+            "f" => 0xF,
+            _ => panic!("KTV")
+        }
+    }
+
+    fn await_then_store_keypress(&mut self, x: u8) {
+        //TODO - do not require hitting enter
+        //TODO - be able to map keyboard keys to the hex keyboard
+        let mut line = String::new();
+        std::io::stdin().read_line(&mut line).expect("Failed to read line");
+
+        let keypress_value = self.keypress_to_value(line);
+
+        self.registers[x as usize] = keypress_value
+    }
 
     fn store_vx_binary_at_i(&mut self, x: u8) {
         let number = self.registers[x as usize];
@@ -404,4 +436,18 @@ mod tests {
         assert_eq!(chip.registers[0xB], 0b01000001);
         assert_eq!(chip.registers[0xF], 0);
     }
+
+    /* Commenting out since you have to type, but it did allow me to test manually
+     * There has to a better way to test this, or even yet a better way to get the input
+    #[test]
+    fn await_then_store_keypress_works() {
+        let mut chip = Chip::new();
+        let vx: u8 = 5;
+
+        chip.await_then_store_keypress(vx);
+
+        assert_eq!(chip.registers[vx as usize], 0xE)
+    }
+    *
+    */
 }
