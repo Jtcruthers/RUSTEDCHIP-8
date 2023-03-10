@@ -99,7 +99,16 @@ impl Chip {
 
     fn await_then_store_keypress(&mut self, x: u8) { }
 
-    fn store_vx_binary_at_i(&mut self, x: u8) { }
+    fn store_vx_binary_at_i(&mut self, x: u8) {
+        let number = self.registers[x as usize];
+        let ones = number % 10;
+        let tens = number / 10 % 10;
+        let hundreds = number / 10 / 10 % 10;
+
+        self.memory[self.i as usize] = hundreds;
+        self.memory[1 + self.i as usize] = tens;
+        self.memory[2 + self.i as usize] = ones;
+    }
 
     fn store_registers_to_i(&mut self, x: u8) {
         for register in 0..x {
@@ -271,5 +280,45 @@ mod tests {
         assert_eq!(decoded_instruction.nibbles[3], 0xD);
         assert_eq!(decoded_instruction.nn, 0xCD);
         assert_eq!(decoded_instruction.nnn, 0xBCD);
+    }
+
+    #[test]
+    fn store_vx_binary_at_i_123() {
+        let mut chip = Chip::new();
+        chip.registers[4] = 123;
+        chip.i = 10;
+
+        chip.store_vx_binary_at_i(4);
+
+        println!("{:?}", chip.memory);
+        assert_eq!(chip.memory[10], 0x1);
+        assert_eq!(chip.memory[11], 0x2);
+        assert_eq!(chip.memory[12], 0x3);
+    }
+
+    #[test]
+    fn store_vx_binary_at_i_999() {
+        let mut chip = Chip::new();
+        chip.registers[8] = 255;
+
+        chip.store_vx_binary_at_i(8);
+
+        println!("{:?}", chip.memory);
+        assert_eq!(chip.memory[0], 0x2);
+        assert_eq!(chip.memory[1], 0x5);
+        assert_eq!(chip.memory[2], 0x5);
+    }
+
+    #[test]
+    fn store_vx_binary_at_i_000() {
+        let mut chip = Chip::new();
+        chip.registers[8] = 0;
+
+        chip.store_vx_binary_at_i(8);
+
+        println!("{:?}", chip.memory);
+        assert_eq!(chip.memory[0], 0x0);
+        assert_eq!(chip.memory[1], 0x0);
+        assert_eq!(chip.memory[2], 0x0);
     }
 }
