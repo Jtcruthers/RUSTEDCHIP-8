@@ -19,8 +19,9 @@ impl Timer {
     }
 }
 
+#[derive(Debug)]
 pub struct DecodedInstruction {
-    id: u8,
+    nibbles: [u8; 4],
     x: u8,
     y: u8,
     n: u8,
@@ -51,6 +52,10 @@ impl Chip {
             pc: 0
         }
     }
+    
+    fn reset_display(&mut self) {
+        self.display = [false; DISPLAY_SIZE];
+    }
 
     fn fetch(&mut self) -> u16 {
         let first_byte = self.memory[self.pc as usize] as u16;
@@ -68,19 +73,136 @@ impl Chip {
         let first_nibble = (instruction >> 12) as u8;
         let second_nibble = ((instruction & 0x0F00) >> 8) as u8;
         let third_nibble = ((instruction & 0x00F0) >> 4) as u8;
-        let n = (instruction & 0x000F) as u8;
+        let fourth_nibble = (instruction & 0x000F) as u8;
+
+        let id = first_nibble;
+        let x = second_nibble;
+        let y = third_nibble;
+        let n = fourth_nibble; 
+
         let nn = (instruction & 0x00FF) as u8;
         let nnn = instruction & 0x0FFF;
 
-        DecodedInstruction { id: first_nibble, x: second_nibble, y: third_nibble, n, nn, nnn }
+        let nibbles = [first_nibble, second_nibble, third_nibble, fourth_nibble];
+
+        DecodedInstruction { nibbles, x, y, n, nn, nnn }
     }
 
-    fn execute(&self) { }
+    fn handle_return(&self) { }
 
-    pub fn step(&mut self) {
+    fn jump(&mut self, address: u16) {
+        self.pc = address
+    }
+
+    fn call_at(&mut self, address: u16) { }
+
+    fn skip_if_eq(&mut self, x: u8, y:u8) {
+        if x == y {
+            self.pc += 1
+        }
+    }
+
+    fn skip_if_not_eq(&mut self, x: u8, y:u8) {
+        if x != y {
+            self.pc += 1
+        }
+    }
+
+    fn set_vx(&mut self, register_address: u8, value: u8) { }
+
+    fn add_nn_to_vx(&mut self, register_address: u8, value: u8) { }
+
+    fn set_vx_to_vy(&mut self, x: u8, y:u8) { }
+
+    fn set_vx_OR_vy(&mut self, x: u8, y:u8) { }
+
+    fn set_vx_AND_vy(&mut self, x: u8, y:u8) { }
+
+    fn set_vx_XOR_vy(&mut self, x: u8, y:u8) { }
+
+    fn set_vx_rand(&mut self, x: u8, seed: u8) { }
+
+    fn vx_add_vy(&mut self, x: u8, y:u8) { }
+
+    fn vx_subtract_vy(&mut self, x: u8, y:u8) { }
+
+    fn vy_subtract_vx(&mut self, x: u8, y:u8) { }
+
+    fn store_least_sig_vx_bit(&mut self, x: u8, y:u8) { }
+
+    fn store_most_sig_vx_bit(&mut self, x: u8, y:u8) { }
+
+    fn set_i_to_address(&mut self, address: u16) { }
+
+    fn set_i_location_of_vx_character_sprite(&mut self, x: u8) { }
+
+    fn draw(&mut self, x: u8, y:u8, n: u8) { }
+
+    fn jump_to_address_plus_v0(&mut self, address: u16) { }
+
+    fn set_vx_to_timer(&mut self, x: u8) { }
+
+    fn set_timer_to_vx(&mut self, use_delay: bool, x: u8) { }
+
+    fn skip_if_key_press(&mut self, x: u8) { }
+
+    fn skip_if_not_key_press(&mut self, x: u8) { }
+
+    fn await_then_store_keypress(&mut self, x: u8) { }
+
+    fn add_vx_to_i(&mut self, x: u8) { }
+
+    fn store_vx_binary_at_i(&mut self, x: u8) { }
+
+    fn store_registers_to_i(&mut self, x: u8) { }
+
+    fn load_registers_to_i(&mut self, x: u8) { }
+
+    fn execute(&mut self, decoded_instruction: DecodedInstruction) {
+        match decoded_instruction.nibbles {
+            [0, 0, 0xE, 0xE] => self.reset_display(),
+            [0, 0, 0xE, 0] => self.handle_return(),
+            [0, _, _, _] => { },
+            [1, _, _, _] => self.jump(decoded_instruction.nnn),
+            [2, _, _, _] => self.call_at(decoded_instruction.nnn),
+            [3, x, _, _] => self.skip_if_eq(x, decoded_instruction.nn),
+            [4, x, _, _] => self.skip_if_not_eq(x, decoded_instruction.nn),
+            [5, x, y, 0] => self.skip_if_eq(x, y),
+            [6, x, _, _] => self.set_vx(x, decoded_instruction.nn),
+            [7, x, _, _] => self.add_nn_to_vx(x, decoded_instruction.nn),
+            [8, x, y, 0] => self.set_vx_to_vy(x, y),
+            [8, x, y, 1] => self.set_vx_OR_vy(x, y),
+            [8, x, y, 2] => self.set_vx_AND_vy(x, y),
+            [8, x, y, 3] => self.set_vx_XOR_vy(x, y),
+            [8, x, y, 4] => self.vx_add_vy(x, y),
+            [8, x, y, 5] => self.vx_subtract_vy(x, y),
+            [8, x, y, 6] => self.store_least_sig_vx_bit(x, y),
+            [8, x, y, 7] => self.vy_subtract_vx(x, y),
+            [8, x, y, 0xE] => self.store_most_sig_vx_bit(x, y),
+            [9, x, y, 0] => self.skip_if_not_eq(x, y),
+            [0xA, _, _, _] => self.set_i_to_address(decoded_instruction.nnn),
+            [0xB, _, _, _] => self.jump_to_address_plus_v0(decoded_instruction.nnn),
+            [0xC, x, _, _] => self.set_vx_rand(x, decoded_instruction.nn),
+            [0xD, x, y, n] => self.draw(x, y, n),
+            [0xE, x, 0x9, 0xE] => self.skip_if_key_press(x),
+            [0xE, x, 0xA, 0x1] => self.skip_if_not_key_press(x),
+            [0xF, x, 0x0, 0x7] => self.set_vx_to_timer(x),
+            [0xF, x, 0x0, 0xA] => self.await_then_store_keypress(x),
+            [0xF, x, 0x1, 0x5] => self.set_timer_to_vx(true, x),
+            [0xF, x, 0x1, 0x8] => self.set_timer_to_vx(false, x),
+            [0xF, x, 0x1, 0xE] => self.add_vx_to_i(x),
+            [0xF, x, 0x2, 0x9] => self.set_i_location_of_vx_character_sprite(x),
+            [0xF, x, 0x3, 0x3] => self.store_vx_binary_at_i(x),
+            [0xF, x, 0x5, 0x5] => self.store_registers_to_i(x),
+            [0xF, x, 0x6, 0x5] => self.load_registers_to_i(x),
+            _ => ()
+        }
+    }
+
+    fn step(&mut self) {
         let instruction = self.fetch();
-        self.decode(instruction);
-        self.execute();
+        let decoded_instruction = self.decode(instruction);
+        self.execute(decoded_instruction);
     }
 
     pub fn run(&mut self) {
