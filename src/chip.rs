@@ -28,7 +28,9 @@ pub struct DecodedInstruction {
     nnn: u16
 }
 
-const DISPLAY_SIZE: usize = 64 * 32;
+const DISPLAY_WIDTH: usize = 64;
+const DISPLAY_HEIGHT: usize = 32;
+const DISPLAY_SIZE: usize = DISPLAY_WIDTH * DISPLAY_HEIGHT;
 
 #[derive(Debug)]
 pub struct Chip {
@@ -105,7 +107,26 @@ impl Chip {
 
     fn set_i_location_of_vx_character_sprite(&mut self, x: u8) { }
 
-    fn draw(&mut self, x: u8, y:u8, n: u8) { }
+    fn draw(&mut self, x: u8, y:u8, height: u8) {
+        let vx = self.registers[x as usize] as usize;
+        let vy = self.registers[y as usize] as usize;
+        let mut starting_index = vx + vy * DISPLAY_WIDTH as usize;
+        let pixel_pattern = self.memory[self.i as usize];
+
+        for _row in 0..height {
+            for offset in 0..8 {
+                let pixel_bit = (pixel_pattern >> 7 - offset) & 1;
+                let pixel_index = starting_index + offset;
+
+                if self.display[pixel_index] == true && pixel_bit == 0 {
+                    self.registers[0xF] = 1; // set VF to 1 if any screen pixels are flipped from set to unset when sprite is drawn
+                }
+                self.display[pixel_index] = pixel_bit == 1;
+            }
+
+            starting_index += DISPLAY_WIDTH;
+        }
+    }
 
     fn skip_if_key_press(&mut self, x: u8) { }
 
