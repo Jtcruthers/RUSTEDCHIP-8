@@ -19,6 +19,15 @@ impl Timer {
     }
 }
 
+pub struct DecodedInstruction {
+    id: u8,
+    x: u8,
+    y: u8,
+    n: u8,
+    nn: u8,
+    nnn: u16
+}
+
 const DISPLAY_SIZE: usize = 64 * 32;
 
 #[derive(Debug)]
@@ -55,12 +64,22 @@ impl Chip {
         combined_bytes
     }
 
-    fn decode(&self) { }
+    fn decode(&self, instruction: u16) -> DecodedInstruction {
+        let first_nibble = (instruction >> 12) as u8;
+        let second_nibble = ((instruction & 0x0F00) >> 8) as u8;
+        let third_nibble = ((instruction & 0x00F0) >> 4) as u8;
+        let n = (instruction & 0x000F) as u8;
+        let nn = (instruction & 0x00FF) as u8;
+        let nnn = instruction & 0x0FFF;
+
+        DecodedInstruction { id: first_nibble, x: second_nibble, y: third_nibble, n, nn, nnn }
+    }
+
     fn execute(&self) { }
 
     pub fn step(&mut self) {
-        self.fetch();
-        self.decode();
+        let instruction = self.fetch();
+        self.decode(instruction);
         self.execute();
     }
 
@@ -135,4 +154,17 @@ mod tests {
         assert_eq!(chip.pc, 32);
     }
 
+    #[test]
+    fn decode_parses_instruction() {
+        let chip = Chip::new();
+        let instruction = 0xABCD;
+
+        let decoded_instruction = chip.decode(instruction);
+
+        assert_eq!(decoded_instruction.x, 0xB);
+        assert_eq!(decoded_instruction.y, 0xC);
+        assert_eq!(decoded_instruction.n, 0xD);
+        assert_eq!(decoded_instruction.nn, 0xCD);
+        assert_eq!(decoded_instruction.nnn, 0xBCD);
+    }
 }
