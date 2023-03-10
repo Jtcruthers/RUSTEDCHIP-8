@@ -22,9 +22,6 @@ impl Timer {
 #[derive(Debug)]
 pub struct DecodedInstruction {
     nibbles: [u8; 4],
-    x: u8,
-    y: u8,
-    n: u8,
     nn: u8,
     nnn: u16
 }
@@ -36,6 +33,7 @@ pub struct Chip {
     pub memory: [u8; 4096],
     pub stack: [u16; 32],
     pub display: [bool; DISPLAY_SIZE],
+    pub registers: [u8; 16],
     pub delay_timer: Timer,
     pub sound_timer: Timer,
     pub pc: u16
@@ -47,12 +45,13 @@ impl Chip {
             memory: [0; 4096],
             stack: [0; 32],
             display: [false; DISPLAY_SIZE],
+            registers: [0; 16],
             delay_timer: Timer::new(),
             sound_timer: Timer::new(),
             pc: 0
         }
     }
-    
+
     fn reset_display(&mut self) {
         self.display = [false; DISPLAY_SIZE];
     }
@@ -74,18 +73,12 @@ impl Chip {
         let second_nibble = ((instruction & 0x0F00) >> 8) as u8;
         let third_nibble = ((instruction & 0x00F0) >> 4) as u8;
         let fourth_nibble = (instruction & 0x000F) as u8;
-
-        let id = first_nibble;
-        let x = second_nibble;
-        let y = third_nibble;
-        let n = fourth_nibble; 
+        let nibbles = [first_nibble, second_nibble, third_nibble, fourth_nibble];
 
         let nn = (instruction & 0x00FF) as u8;
         let nnn = instruction & 0x0FFF;
 
-        let nibbles = [first_nibble, second_nibble, third_nibble, fourth_nibble];
-
-        DecodedInstruction { nibbles, x, y, n, nn, nnn }
+        DecodedInstruction { nibbles, nn, nnn }
     }
 
     fn handle_return(&self) { }
@@ -283,9 +276,10 @@ mod tests {
 
         let decoded_instruction = chip.decode(instruction);
 
-        assert_eq!(decoded_instruction.x, 0xB);
-        assert_eq!(decoded_instruction.y, 0xC);
-        assert_eq!(decoded_instruction.n, 0xD);
+        assert_eq!(decoded_instruction.nibbles[0], 0xA);
+        assert_eq!(decoded_instruction.nibbles[1], 0xB);
+        assert_eq!(decoded_instruction.nibbles[2], 0xC);
+        assert_eq!(decoded_instruction.nibbles[3], 0xD);
         assert_eq!(decoded_instruction.nn, 0xCD);
         assert_eq!(decoded_instruction.nnn, 0xBCD);
     }
