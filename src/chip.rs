@@ -275,15 +275,17 @@ impl Chip {
         self.execute(decoded_instruction);
     }
 
-    pub fn run(&mut self) {
-        loop {
-            self.step()
+    fn load_rom(&mut self, rom: &Vec<u8>) {
+        for (offset, byte) in rom.iter().enumerate() {
+            self.memory[ROM_ADDR + offset] = *byte;
         }
     }
 
-    pub fn load_rom(&mut self, rom: &[u8]) {
-        for (offset, byte) in rom.iter().enumerate() {
-            self.memory[ROM_ADDR+ offset] = *byte;
+    pub fn run(&mut self, rom: &Vec<u8>) {
+        self.load_rom(rom);
+
+        loop {
+            self.step()
         }
     }
 }
@@ -462,7 +464,7 @@ mod tests {
     #[test]
     fn load_rom() {
         let mut chip = Chip::new();
-        let rom: [u8; 8] = [0xD, 0xE, 0xA, 0xD, 0xB, 0xE, 0xE, 0xF];
+        let rom: Vec<u8> = vec![0xD, 0xE, 0xA, 0xD, 0xB, 0xE, 0xE, 0xF];
 
         chip.load_rom(&rom);
 
