@@ -1,5 +1,6 @@
 use rand::Rng;
 use crate::font;
+use std::process;
 
 const DISPLAY_WIDTH: usize = 64;
 const DISPLAY_HEIGHT: usize = 32;
@@ -70,7 +71,7 @@ impl Chip {
         chip
     }
 
-    fn reset_display(&mut self) {
+    fn clear_display(&mut self) {
         self.display = [false; DISPLAY_SIZE];
     }
 
@@ -91,13 +92,13 @@ impl Chip {
 
     fn skip_if_eq(&mut self, x: u8, y:u8) {
         if x == y {
-            self.pc += 1
+            self.pc += 2
         }
     }
 
     fn skip_if_not_eq(&mut self, x: u8, y:u8) {
         if x != y {
-            self.pc += 1
+            self.pc += 2
         }
     }
 
@@ -123,36 +124,64 @@ impl Chip {
     }
 
     fn set_i_location_of_vx_character_sprite(&mut self, x: u8) {
+        println!("SETTING LOCATION OF I TO FONT_ADDR + V{}", x);
         self.i = FONT_ADDR + (x as usize * font::FONT_SIZE);
     }
 
+    fn print_screen(&self) {
+        for _ in 0..DISPLAY_WIDTH {
+            print!("-");
+        }
+        println!("");
+        for row in 0..DISPLAY_HEIGHT {
+            print!("|");
+            for column in 0..DISPLAY_WIDTH {
+                let pixel = DISPLAY_WIDTH * row + column;
+                let sprite = if self.display[pixel] == true { "X" } else { " "};
+                print!("{}", sprite);
+            }
+            println!("|");
+        }
+        for _ in 0..DISPLAY_WIDTH {
+            print!("-");
+        }
+        println!("");
+    }
+
+    //Draw sprite at coord (x, y) that is 8 pixels wide and the height arg tall
     fn draw(&mut self, x: u8, y:u8, height: u8) {
         let vx = self.registers[x as usize] as usize;
         let vy = self.registers[y as usize] as usize;
         let mut starting_index = vx + vy * DISPLAY_WIDTH as usize;
         let pixel_pattern = self.memory[self.i];
+        println!("SELF.I: {:#04X}", self.i);
+        println!("PIXEL_PATTERN: {:#08b}", pixel_pattern);
+
+        self.registers[0xF] = 0;
 
         for _row in 0..height {
             for offset in 0..8 {
                 let pixel_bit = (pixel_pattern >> 7 - offset) & 1;
                 let pixel_index = starting_index + offset;
 
+                // set VF to 1 if any screen pixels are flipped from set to unset when sprite is drawn
                 if self.display[pixel_index] == true && pixel_bit == 0 {
-                    self.registers[0xF] = 1; // set VF to 1 if any screen pixels are flipped from set to unset when sprite is drawn
+                    self.registers[0xF] = 1; 
                 }
                 self.display[pixel_index] = pixel_bit == 1;
             }
 
             starting_index += DISPLAY_WIDTH;
         }
+
+            self.print_screen();
     }
 
-    fn skip_if_key_press(&mut self, x: u8) { }
+    fn skip_if_key_press(&mut self, _x: u8) { }
 
-    fn skip_if_not_key_press(&mut self, x: u8) { }
+    fn skip_if_not_key_press(&mut self, _x: u8) { }
 
     fn keypress_to_value(&self, keypress: String) -> u8 {
-        println!("WAIT WHAT IS THIS: {}", keypress.trim());
         match keypress.trim() {
             "0" => 0x0,
             "1" => 0x1,
@@ -170,7 +199,7 @@ impl Chip {
             "d" => 0xD,
             "e" => 0xE,
             "f" => 0xF,
-            _ => panic!("KTV")
+            _ => panic!("UNKNOWN KEY")
         }
     }
 
@@ -237,8 +266,8 @@ impl Chip {
 
     fn execute(&mut self, decoded_instruction: DecodedInstruction) {
         match decoded_instruction.nibbles {
-            [0, 0, 0x0, 0x0] => panic!("I think it ended"),
-            [0, 0, 0xE, 0x0] => self.reset_display(),
+            [0, 0, 0x0, 0x0] => process::exit(1),
+            [0, 0, 0xE, 0x0] => self.clear_display(),
             [0, 0, 0xE, 0xE] => self.handle_return(),
             [0, _, _, _] => { },
             [1, _, _, _] => self.jump(decoded_instruction.nnn),
@@ -278,8 +307,11 @@ impl Chip {
     }
 
     fn step(&mut self) {
+        println!("\nPC: {}", self.pc);
         let instruction = self.fetch();
+        println!("instruction: {}", instruction);
         let decoded_instruction = self.decode(instruction);
+        println!("decoded instruction: [{:X}, {:X}, {:X}, {:X}]\tNN: {:#04X}\tNNN: {:#04X}", decoded_instruction.nibbles[0],decoded_instruction.nibbles[1],decoded_instruction.nibbles[2],decoded_instruction.nibbles[3], decoded_instruction.nn, decoded_instruction.nnn);
         self.execute(decoded_instruction);
     }
 
@@ -291,7 +323,13 @@ impl Chip {
     }
 
     pub fn run(&mut self, rom: &Vec<u8>) {
+        //Put the passed rom 
         self.load_rom(rom);
+        print!("MEMORY: [");
+        for b in self.memory {
+            print!("{:#X} ", b)
+        }
+        println!("]");
 
         loop {
             self.step()
@@ -318,7 +356,7 @@ mod tests {
         let chip = Chip::new();
         assert_eq!(chip.stack.len(), 32);
         for stack_frame in chip.stack.iter() {
-            assert_eq!(*stack_frame, 0x00000000 as u16)
+            assert_eq!(*stack_frame, 0x00000000)
         }
     }
 
@@ -390,7 +428,6 @@ mod tests {
 
         chip.store_vx_binary_at_i(4);
 
-        println!("{:?}", chip.memory);
         assert_eq!(chip.memory[10], 0x1);
         assert_eq!(chip.memory[11], 0x2);
         assert_eq!(chip.memory[12], 0x3);
@@ -403,7 +440,6 @@ mod tests {
 
         chip.store_vx_binary_at_i(8);
 
-        println!("{:?}", chip.memory);
         assert_eq!(chip.memory[0], 0x2);
         assert_eq!(chip.memory[1], 0x5);
         assert_eq!(chip.memory[2], 0x5);
@@ -416,7 +452,6 @@ mod tests {
 
         chip.store_vx_binary_at_i(8);
 
-        println!("{:?}", chip.memory);
         assert_eq!(chip.memory[0], 0x0);
         assert_eq!(chip.memory[1], 0x0);
         assert_eq!(chip.memory[2], 0x0);
