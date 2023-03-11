@@ -38,9 +38,10 @@ pub struct DecodedInstruction {
 #[derive(Debug)]
 pub struct Chip {
     pub memory: [u8; 4096],
-    pub stack: [u16; 32],
-    pub display: [bool; DISPLAY_SIZE],
     pub registers: [u8; 16],
+    pub stack: [usize; 32],
+    pub stack_level: usize,
+    pub display: [bool; DISPLAY_SIZE],
     pub delay_timer: Timer,
     pub sound_timer: Timer,
     pub i: usize,
@@ -52,6 +53,7 @@ impl Chip {
         let mut chip = Chip {
             memory: [0; 4096],
             stack: [0; 32],
+            stack_level: 0,
             display: [false; DISPLAY_SIZE],
             registers: [0; 16],
             delay_timer: Timer::new(),
@@ -72,15 +74,20 @@ impl Chip {
         self.display = [false; DISPLAY_SIZE];
     }
 
-    // TODO - figure out how functions will work with stack
-    fn handle_return(&self) { }
+    fn handle_return(&mut self) {
+        self.pc = self.stack[self.stack_level];
+        self.stack_level = self.stack_level - 1;
+    }
 
     fn jump(&mut self, address: u16) {
         self.pc = address as usize;
     }
 
-    // TODO - figure out how functions will work with stack
-    fn call_at(&mut self, address: u16) { }
+    fn call_at(&mut self, address: usize) {
+        self.stack_level = self.stack_level + 1;
+        self.stack[self.stack_level] = self.pc;
+        self.pc = address;
+    }
 
     fn skip_if_eq(&mut self, x: u8, y:u8) {
         if x == y {
@@ -234,7 +241,7 @@ impl Chip {
             [0, 0, 0xE, 0] => self.handle_return(),
             [0, _, _, _] => { },
             [1, _, _, _] => self.jump(decoded_instruction.nnn),
-            [2, _, _, _] => self.call_at(decoded_instruction.nnn),
+            [2, _, _, _] => self.call_at(decoded_instruction.nnn as usize),
             [3, x, _, _] => self.skip_if_eq(x, decoded_instruction.nn),
             [4, x, _, _] => self.skip_if_not_eq(x, decoded_instruction.nn),
             [5, x, y, 0x0] => self.skip_if_eq(x, self.registers[y as usize]),
@@ -278,6 +285,7 @@ impl Chip {
     fn load_rom(&mut self, rom: &Vec<u8>) {
         for (offset, byte) in rom.iter().enumerate() {
             self.memory[ROM_ADDR + offset] = *byte;
+            self.pc = ROM_ADDR;
         }
     }
 
