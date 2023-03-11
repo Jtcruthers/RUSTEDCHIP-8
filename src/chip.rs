@@ -1,4 +1,10 @@
 use rand::Rng;
+use crate::font;
+
+const DISPLAY_WIDTH: usize = 64;
+const DISPLAY_HEIGHT: usize = 32;
+const DISPLAY_SIZE: usize = DISPLAY_WIDTH * DISPLAY_HEIGHT;
+const FONT_ADDR: usize = 0x050;
 
 #[derive(Debug)]
 pub struct Timer {
@@ -28,10 +34,6 @@ pub struct DecodedInstruction {
     nnn: u16
 }
 
-const DISPLAY_WIDTH: usize = 64;
-const DISPLAY_HEIGHT: usize = 32;
-const DISPLAY_SIZE: usize = DISPLAY_WIDTH * DISPLAY_HEIGHT;
-
 #[derive(Debug)]
 pub struct Chip {
     pub memory: [u8; 4096],
@@ -45,8 +47,14 @@ pub struct Chip {
 }
 
 impl Chip {
+    fn load_into_memory(&mut self, address: usize, data: &[u8]) {
+        for (offset, byte) in data.iter().enumerate() {
+            self.memory[address + offset] = *byte;
+        }
+    }
+
     pub fn new() -> Self {
-        Chip {
+        let mut chip = Chip {
             memory: [0; 4096],
             stack: [0; 32],
             display: [false; DISPLAY_SIZE],
@@ -55,7 +63,12 @@ impl Chip {
             delay_timer: Timer::new(),
             sound_timer: Timer::new(),
             pc: 0
-        }
+        };
+
+        let font = font::get_font();
+        chip.load_into_memory(0x050, &font);
+
+        chip
     }
 
     fn reset_display(&mut self) {
@@ -105,7 +118,9 @@ impl Chip {
         self.registers[x as usize] = vx << 1;
     }
 
-    fn set_i_location_of_vx_character_sprite(&mut self, x: u8) { }
+    fn set_i_location_of_vx_character_sprite(&mut self, x: u8) {
+        self.i = FONT_ADDR + (x as usize * font::FONT_SIZE);
+    }
 
     fn draw(&mut self, x: u8, y:u8, height: u8) {
         let vx = self.registers[x as usize] as usize;
@@ -275,9 +290,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn initial_memory_is_4_zeroed_out_kilobytes() {
+    fn initial_memory_has_font_at_0x050() {
         let chip = Chip::new();
-        assert_eq!(chip.memory, [0 as u8; 4096]);
+        let font = font::get_font();
+
+        for (i, byte) in font.iter().enumerate() {
+            assert_eq!(*byte, chip.memory[0x050 + i]);
+        }
     }
 
     #[test]
