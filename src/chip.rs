@@ -237,8 +237,9 @@ impl Chip {
 
     fn execute(&mut self, decoded_instruction: DecodedInstruction) {
         match decoded_instruction.nibbles {
-            [0, 0, 0xE, 0xE] => self.reset_display(),
-            [0, 0, 0xE, 0] => self.handle_return(),
+            [0, 0, 0x0, 0x0] => panic!("I think it ended"),
+            [0, 0, 0xE, 0x0] => self.reset_display(),
+            [0, 0, 0xE, 0xE] => self.handle_return(),
             [0, _, _, _] => { },
             [1, _, _, _] => self.jump(decoded_instruction.nnn),
             [2, _, _, _] => self.call_at(decoded_instruction.nnn as usize),
