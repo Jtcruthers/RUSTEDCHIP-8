@@ -5,6 +5,7 @@ const DISPLAY_WIDTH: usize = 64;
 const DISPLAY_HEIGHT: usize = 32;
 const DISPLAY_SIZE: usize = DISPLAY_WIDTH * DISPLAY_HEIGHT;
 const FONT_ADDR: usize = 0x050;
+const ROM_ADDR: usize = 0x0A0;
 
 #[derive(Debug)]
 pub struct Timer {
@@ -47,12 +48,6 @@ pub struct Chip {
 }
 
 impl Chip {
-    fn load_into_memory(&mut self, address: usize, data: &[u8]) {
-        for (offset, byte) in data.iter().enumerate() {
-            self.memory[address + offset] = *byte;
-        }
-    }
-
     pub fn new() -> Self {
         let mut chip = Chip {
             memory: [0; 4096],
@@ -66,7 +61,9 @@ impl Chip {
         };
 
         let font = font::get_font();
-        chip.load_into_memory(0x050, &font);
+        for (offset, byte) in font.iter().enumerate() {
+            chip.memory[FONT_ADDR + offset] = *byte;
+        }
 
         chip
     }
@@ -283,6 +280,12 @@ impl Chip {
             self.step()
         }
     }
+
+    pub fn load_rom(&mut self, rom: &[u8]) {
+        for (offset, byte) in rom.iter().enumerate() {
+            self.memory[ROM_ADDR+ offset] = *byte;
+        }
+    }
 }
 
 #[cfg(test)]
@@ -454,6 +457,23 @@ mod tests {
 
         assert_eq!(chip.registers[0xB], 0b01000001);
         assert_eq!(chip.registers[0xF], 0);
+    }
+
+    #[test]
+    fn load_rom() {
+        let mut chip = Chip::new();
+        let rom: [u8; 8] = [0xD, 0xE, 0xA, 0xD, 0xB, 0xE, 0xE, 0xF];
+
+        chip.load_rom(&rom);
+
+        assert_eq!(chip.memory[ROM_ADDR + 0], 0xD);
+        assert_eq!(chip.memory[ROM_ADDR + 1], 0xE);
+        assert_eq!(chip.memory[ROM_ADDR + 2], 0xA);
+        assert_eq!(chip.memory[ROM_ADDR + 3], 0xD);
+        assert_eq!(chip.memory[ROM_ADDR + 4], 0xB);
+        assert_eq!(chip.memory[ROM_ADDR + 5], 0xE);
+        assert_eq!(chip.memory[ROM_ADDR + 6], 0xE);
+        assert_eq!(chip.memory[ROM_ADDR + 7], 0xF);
     }
 
     /* Commenting out since you have to type, but it did allow me to test manually
