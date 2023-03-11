@@ -40,10 +40,10 @@ pub struct Chip {
     pub stack: [u16; 32],
     pub display: [bool; DISPLAY_SIZE],
     pub registers: [u8; 16],
-    pub i: u16,
     pub delay_timer: Timer,
     pub sound_timer: Timer,
-    pub pc: u16
+    pub i: usize,
+    pub pc: usize
 }
 
 impl Chip {
@@ -59,9 +59,9 @@ impl Chip {
             stack: [0; 32],
             display: [false; DISPLAY_SIZE],
             registers: [0; 16],
-            i: 0,
             delay_timer: Timer::new(),
             sound_timer: Timer::new(),
+            i: 0,
             pc: 0
         };
 
@@ -79,7 +79,7 @@ impl Chip {
     fn handle_return(&self) { }
 
     fn jump(&mut self, address: u16) {
-        self.pc = address
+        self.pc = address as usize;
     }
 
     // TODO - figure out how functions will work with stack
@@ -126,7 +126,7 @@ impl Chip {
         let vx = self.registers[x as usize] as usize;
         let vy = self.registers[y as usize] as usize;
         let mut starting_index = vx + vy * DISPLAY_WIDTH as usize;
-        let pixel_pattern = self.memory[self.i as usize];
+        let pixel_pattern = self.memory[self.i];
 
         for _row in 0..height {
             for offset in 0..8 {
@@ -187,28 +187,28 @@ impl Chip {
         let tens = number / 10 % 10;
         let hundreds = number / 10 / 10 % 10;
 
-        self.memory[self.i as usize] = hundreds;
-        self.memory[1 + self.i as usize] = tens;
-        self.memory[2 + self.i as usize] = ones;
+        self.memory[self.i] = hundreds;
+        self.memory[1 + self.i] = tens;
+        self.memory[2 + self.i] = ones;
     }
 
     fn store_registers_to_i(&mut self, x: u8) {
         for register in 0..x {
-            let address = (self.i + register as u16) as usize;
+            let address = self.i + register as usize;
             self.memory[address] = self.registers[register as usize];
         }
     }
 
     fn load_registers_to_i(&mut self, x: u8) {
         for register in 0..x {
-            let address = (self.i + register as u16) as usize;
+            let address = self.i + register as usize;
             self.registers[register as usize] = self.memory[address]
         }
     }
 
     fn fetch(&mut self) -> u16 {
-        let first_byte = self.memory[self.pc as usize] as u16;
-        let second_byte = self.memory[1 + self.pc as usize] as u16;
+        let first_byte = self.memory[self.pc] as u16;
+        let second_byte = self.memory[1 + self.pc] as u16;
 
         let shifted_first_byte = first_byte << 8; // 0xAB becomes 0xAB00
         let combined_bytes = shifted_first_byte + second_byte;
@@ -253,8 +253,8 @@ impl Chip {
             [8, x, y, 7] => self.registers[x as usize] = self.registers[y as usize] - self.registers[x as usize],
             [8, x, _, 0xE] => self.store_most_sig_vx_bit(x),
             [9, x, y, 0] => self.skip_if_not_eq(x, self.registers[y as usize]),
-            [0xA, _, _, _] => self.i = decoded_instruction.nnn,
-            [0xB, _, _, _] => self.pc = self.registers[0] as u16 + decoded_instruction.nnn,
+            [0xA, _, _, _] => self.i = decoded_instruction.nnn as usize,
+            [0xB, _, _, _] => self.pc = (self.registers[0] as u16 + decoded_instruction.nnn) as usize,
             [0xC, x, _, _] => self.set_vx_rand(x, decoded_instruction.nn),
             [0xD, x, y, n] => self.draw(x, y, n),
             [0xE, x, 0x9, 0xE] => self.skip_if_key_press(x),
@@ -263,7 +263,7 @@ impl Chip {
             [0xF, x, 0x0, 0xA] => self.await_then_store_keypress(x),
             [0xF, x, 0x1, 0x5] => self.delay_timer.set(self.registers[x as usize]),
             [0xF, x, 0x1, 0x8] => self.sound_timer.set(self.registers[x as usize]),
-            [0xF, x, 0x1, 0xE] => self.i += self.registers[x as usize] as u16,
+            [0xF, x, 0x1, 0xE] => self.i += self.registers[x as usize] as usize,
             [0xF, x, 0x2, 0x9] => self.set_i_location_of_vx_character_sprite(x),
             [0xF, x, 0x3, 0x3] => self.store_vx_binary_at_i(x),
             [0xF, x, 0x5, 0x5] => self.store_registers_to_i(x),

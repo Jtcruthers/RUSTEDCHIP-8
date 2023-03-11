@@ -1,3 +1,6 @@
+// How many bites each font sprite is
+pub const FONT_SIZE: usize = 5;
+
 pub fn get_font() -> [u8; 80] {
     let font = [
         0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
