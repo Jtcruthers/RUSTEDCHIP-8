@@ -6,7 +6,7 @@ const DISPLAY_WIDTH: usize = 64;
 const DISPLAY_HEIGHT: usize = 32;
 const DISPLAY_SIZE: usize = DISPLAY_WIDTH * DISPLAY_HEIGHT;
 const FONT_ADDR: usize = 0x050;
-const ROM_ADDR: usize = 0x0A0;
+const ROM_ADDR: usize = 0x200;
 
 #[derive(Debug)]
 pub struct Timer {
@@ -159,10 +159,13 @@ impl Chip {
 
         self.registers[0xF] = 0;
 
-        for _row in 0..height {
+        for row in 0..height {
             for offset in 0..8 {
                 let pixel_bit = (pixel_pattern >> 7 - offset) & 1;
                 let pixel_index = starting_index + offset;
+                if pixel_index >= DISPLAY_WIDTH * (row as usize + 1) {
+                    continue;
+                }
 
                 // set VF to 1 if any screen pixels are flipped from set to unset when sprite is drawn
                 if self.display[pixel_index] == true && pixel_bit == 0 {
@@ -325,6 +328,7 @@ impl Chip {
     pub fn run(&mut self, rom: &Vec<u8>) {
         //Put the passed rom 
         self.load_rom(rom);
+
         print!("MEMORY: [");
         for b in self.memory {
             print!("{:#X} ", b)
