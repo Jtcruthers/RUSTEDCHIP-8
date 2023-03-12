@@ -13,5 +13,7 @@ Keyboard emulates a hex keyboard, using:
 ### Run tests:
 `cargo test`
 
-### Run project
-`cargo run`
+### Run a rom
+`cargo run ./path/to/rom`
+
+There are some test roms provided
