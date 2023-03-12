@@ -153,18 +153,21 @@ impl Chip {
         let vx = self.registers[x as usize] as usize;
         let vy = self.registers[y as usize] as usize;
         let mut starting_index = vx + vy * DISPLAY_WIDTH as usize;
-        let pixel_pattern = self.memory[self.i];
-        println!("SELF.I: {:#04X}", self.i);
-        println!("PIXEL_PATTERN: {:#08b}", pixel_pattern);
+        println!("SELF.I: {:#04X}\tX: {}\tY: {}", self.i, vx, vy);
 
         self.registers[0xF] = 0;
 
         for row in 0..height {
+            // Each row is a byte in memory, so to get the next row, go to the next memory addr
+            let pixel_pattern = self.memory[self.i + row as usize];
+
             for offset in 0..8 {
                 let pixel_bit = (pixel_pattern >> 7 - offset) & 1;
                 let pixel_index = starting_index + offset;
                 if pixel_index >= DISPLAY_WIDTH * (row as usize + 1) {
-                    continue;
+                    println!("{} {} SKIPPING THIS ONE: {} - {} {}", x, y, pixel_index, row, offset);
+                } else {
+                    println!("{} {} DRAWING: {} - {} {}", x, y, pixel_index, row, offset);
                 }
 
                 // set VF to 1 if any screen pixels are flipped from set to unset when sprite is drawn
@@ -310,11 +313,8 @@ impl Chip {
     }
 
     fn step(&mut self) {
-        println!("\nPC: {}", self.pc);
         let instruction = self.fetch();
-        println!("instruction: {}", instruction);
         let decoded_instruction = self.decode(instruction);
-        println!("decoded instruction: [{:X}, {:X}, {:X}, {:X}]\tNN: {:#04X}\tNNN: {:#04X}", decoded_instruction.nibbles[0],decoded_instruction.nibbles[1],decoded_instruction.nibbles[2],decoded_instruction.nibbles[3], decoded_instruction.nn, decoded_instruction.nnn);
         self.execute(decoded_instruction);
     }
 

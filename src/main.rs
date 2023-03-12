@@ -4,7 +4,7 @@ mod chip;
 mod font;
 
 fn get_rom() -> Vec<u8> {
-    let filename =  "./ibm_logo.ch8";
+    let filename =  "./test_roms/ibm_logo.ch8";
 
     fs::read(filename).expect("Cannot read rom")
 }
