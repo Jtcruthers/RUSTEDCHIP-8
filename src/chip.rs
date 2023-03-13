@@ -294,7 +294,7 @@ impl Chip {
             [7, x, _, _] => self.registers[x as usize] = {
                 let sum = self.registers[x as usize] as u16 + decoded_instruction.nn as u16;
                 if sum > 255 {
-                    (sum - 255) as u8
+                    (sum - 255 - 1) as u8
                 } else {
                     sum as u8
                 }
@@ -343,7 +343,9 @@ impl Chip {
             [0xF, x, 0x1, 0x8] => self.sound_timer.set(self.registers[x as usize]),
             [0xF, x, 0x1, 0xE] => self.i += self.registers[x as usize] as usize,
             [0xF, x, 0x2, 0x9] => self.set_i_location_of_vx_character_sprite(x),
-            [0xF, x, 0x3, 0x3] => self.store_vx_binary_at_i(x),
+            [0xF, x, 0x3, 0x3] => {
+                self.store_vx_binary_at_i(x);
+            },
             [0xF, x, 0x5, 0x5] => self.store_registers_to_i(x),
             [0xF, x, 0x6, 0x5] => self.load_registers_to_i(x),
             _ => ()
@@ -476,7 +478,20 @@ mod tests {
     }
 
     #[test]
-    fn store_vx_binary_at_i_999() {
+    fn store_vx_binary_at_i_000() {
+        let mut chip = Chip::new();
+        let vx = 8;
+        chip.registers[vx] = 0;
+
+        chip.store_vx_binary_at_i(vx as u8);
+
+        assert_eq!(chip.memory[0], 0x0);
+        assert_eq!(chip.memory[1], 0x0);
+        assert_eq!(chip.memory[2], 0x0);
+    }
+
+    #[test]
+    fn store_vx_binary_at_i_255() {
         let mut chip = Chip::new();
         chip.registers[8] = 255;
 
@@ -485,18 +500,6 @@ mod tests {
         assert_eq!(chip.memory[0], 0x2);
         assert_eq!(chip.memory[1], 0x5);
         assert_eq!(chip.memory[2], 0x5);
-    }
-
-    #[test]
-    fn store_vx_binary_at_i_000() {
-        let mut chip = Chip::new();
-        chip.registers[8] = 0;
-
-        chip.store_vx_binary_at_i(8);
-
-        assert_eq!(chip.memory[0], 0x0);
-        assert_eq!(chip.memory[1], 0x0);
-        assert_eq!(chip.memory[2], 0x0);
     }
 
     #[test]
@@ -593,6 +596,44 @@ mod tests {
         assert_eq!(chip.memory[ROM_ADDR + 5], 0xE);
         assert_eq!(chip.memory[ROM_ADDR + 6], 0xE);
         assert_eq!(chip.memory[ROM_ADDR + 7], 0xF);
+    }
+
+    #[test]
+    fn test_7xnn_add_vx_and_nn() {
+        let vx = 0x3;
+        let vf = 0xF;
+        let mut chip = Chip::new();
+        let decoded_instruction = DecodedInstruction {
+            nibbles: [0x7, vx, 0x0, 0xF],
+            nn: 0x0F,
+            nnn: 0x30F
+        };
+        chip.registers[vx as usize] = 0x10;
+        chip.registers[vf as usize] = 0x01;
+
+        chip.execute(decoded_instruction);
+
+        assert_eq!(chip.registers[vx as usize], 0x1F);
+        assert_eq!(chip.registers[vf], 0x1); // Carry flag is unchanged
+    }
+
+    #[test]
+    fn test_7xnn_add_vx_and_nn_overflow() {
+        let vx = 0x3;
+        let vf = 0xF;
+        let mut chip = Chip::new();
+        let decoded_instruction = DecodedInstruction {
+            nibbles: [0x7, vx, 0xF, 0x0],
+            nn: 0xF0,
+            nnn: 0x3F0
+        };
+        chip.registers[vx as usize] = 0xF0;
+        chip.registers[vf as usize] = 0x00;
+
+        chip.execute(decoded_instruction);
+
+        assert_eq!(chip.registers[vx as usize], 0xE0);
+        assert_eq!(chip.registers[vf], 0x0); // Carry flag is unchanged
     }
 
     /* Commenting out since you have to type, but it did allow me to test manually
