@@ -76,8 +76,13 @@ impl Chip {
     }
 
     fn handle_return(&mut self) {
+        if self.stack_level == 0 {
+            println!("Can't return from empty stack");
+            process::exit(1);
+        }
+        self.stack_level = self.stack_level - 1; // stack_level is set to next empty slot in stack,
+                                                 // so go back one level to get the last used slot
         self.pc = self.stack[self.stack_level];
-        self.stack_level = self.stack_level - 1;
     }
 
     fn jump(&mut self, address: u16) {
@@ -85,21 +90,9 @@ impl Chip {
     }
 
     fn call_at(&mut self, address: usize) {
-        self.stack_level = self.stack_level + 1;
         self.stack[self.stack_level] = self.pc;
+        self.stack_level = self.stack_level + 1;
         self.pc = address;
-    }
-
-    fn skip_if_eq(&mut self, x: u8, y:u8) {
-        if x == y {
-            self.pc += 2
-        }
-    }
-
-    fn skip_if_not_eq(&mut self, x: u8, y:u8) {
-        if x != y {
-            self.pc += 2
-        }
     }
 
     fn set_vx_rand(&mut self, x: u8, seed: u8) {
@@ -164,6 +157,10 @@ impl Chip {
             for offset in 0..8 {
                 let pixel_bit = (pixel_pattern >> 7 - offset) & 1;
                 let pixel_index = starting_index + offset;
+                if pixel_index >= 2048 {
+                    continue;
+                }
+
                 if pixel_index >= DISPLAY_WIDTH * (row as usize + 1) {
                     println!("{} {} SKIPPING THIS ONE: {} - {} {}", x, y, pixel_index, row, offset);
                 } else {
@@ -278,21 +275,62 @@ impl Chip {
             [0, _, _, _] => { },
             [1, _, _, _] => self.jump(decoded_instruction.nnn),
             [2, _, _, _] => self.call_at(decoded_instruction.nnn as usize),
-            [3, x, _, _] => self.skip_if_eq(x, decoded_instruction.nn),
-            [4, x, _, _] => self.skip_if_not_eq(x, decoded_instruction.nn),
-            [5, x, y, 0x0] => self.skip_if_eq(x, self.registers[y as usize]),
+            [3, x, _, _] => {
+                if self.registers[x as usize] == decoded_instruction.nn {
+                    self.pc += 2
+                }
+            },
+            [4, x, _, _] => {
+                if self.registers[x as usize] != decoded_instruction.nn {
+                    self.pc += 2
+                }
+            },
+            [5, x, y, 0x0] => {
+                if self.registers[x as usize] == self.registers[y as usize] {
+                    self.pc += 2
+                }
+            },
             [6, x, _, _] => self.registers[x as usize] = decoded_instruction.nn,
-            [7, x, _, _] => self.registers[x as usize] += decoded_instruction.nn,
+            [7, x, _, _] => self.registers[x as usize] = {
+                let sum = self.registers[x as usize] as u16 + decoded_instruction.nn as u16;
+                if sum > 255 {
+                    (sum - 255) as u8
+                } else {
+                    sum as u8
+                }
+            },
             [8, x, y, 0] => self.registers[x as usize] = self.registers[y as usize],
             [8, x, y, 1] => self.registers[x as usize] = self.registers[x as usize] | self.registers[y as usize],
             [8, x, y, 2] => self.registers[x as usize] = self.registers[x as usize] & self.registers[y as usize],
             [8, x, y, 3] => self.registers[x as usize] = self.registers[x as usize] ^ self.registers[y as usize],
-            [8, x, y, 4] => self.registers[x as usize] = self.registers[x as usize] + self.registers[y as usize],
-            [8, x, y, 5] => self.registers[x as usize] = self.registers[x as usize] - self.registers[y as usize],
+            [8, x, y, 4] => self.registers[x as usize] = {
+                let sum = self.registers[x as usize] as u16 + self.registers[y as usize] as u16;
+                if sum > 255 {
+                    self.registers[0xF] = 1;
+                    (sum - 255) as u8
+                } else {
+                    self.registers[0xF] = 0;
+                    sum as u8
+                }
+            },
+            [8, x, y, 5] => self.registers[x as usize] = {
+                if self.registers[x as usize] >= self.registers[y as usize] {
+                    self.registers[0xF] = 1;
+                    self.registers[x as usize] - self.registers[y as usize]
+                } else {
+                    let positive_diff = self.registers[y as usize] - self.registers[x as usize];
+                    self.registers[0xF] = 0;
+                    0xFF - self.registers[x as usize] - positive_diff
+                }
+            },
             [8, x, _, 6] => self.store_least_sig_vx_bit(x),
             [8, x, y, 7] => self.registers[x as usize] = self.registers[y as usize] - self.registers[x as usize],
             [8, x, _, 0xE] => self.store_most_sig_vx_bit(x),
-            [9, x, y, 0] => self.skip_if_not_eq(x, self.registers[y as usize]),
+            [9, x, y, 0] => {
+                if self.registers[x as usize] != self.registers[y as usize] {
+                    self.pc += 2
+                }
+            },
             [0xA, _, _, _] => self.i = decoded_instruction.nnn as usize,
             [0xB, _, _, _] => self.pc = (self.registers[0] as u16 + decoded_instruction.nnn) as usize,
             [0xC, x, _, _] => self.set_vx_rand(x, decoded_instruction.nn),
@@ -507,6 +545,37 @@ mod tests {
 
         assert_eq!(chip.registers[0xB], 0b01000001);
         assert_eq!(chip.registers[0xF], 0);
+    }
+
+    #[test]
+    fn calling_and_returning_from_functions_works() {
+        let mut chip = Chip::new();
+        chip.pc = 0xFFF;
+
+        chip.call_at(0x200);
+        assert_eq!(chip.stack[0], 0xFFF);
+        assert_eq!(chip.pc, 0x200);
+
+        chip.call_at(0x300);
+        assert_eq!(chip.stack[1], 0x200);
+        assert_eq!(chip.pc, 0x300);
+
+        chip.call_at(0x400);
+        assert_eq!(chip.stack[2], 0x300);
+        assert_eq!(chip.pc, 0x400);
+        assert_eq!(chip.stack_level, 3);
+
+        // Now Return
+        chip.handle_return();
+        assert_eq!(chip.pc, 0x300);
+        assert_eq!(chip.stack[2], 0x300); // We dont clear the stack, just overwrite it
+
+        chip.handle_return();
+        assert_eq!(chip.pc, 0x200);
+
+        chip.handle_return();
+        assert_eq!(chip.pc, 0xFFF);
+        assert_eq!(chip.stack_level, 0);
     }
 
     #[test]
