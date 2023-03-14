@@ -258,10 +258,11 @@ impl Chip {
             [8, x, y, 2] => self.registers[x as usize] = self.registers[x as usize] & self.registers[y as usize],
             [8, x, y, 3] => self.registers[x as usize] = self.registers[x as usize] ^ self.registers[y as usize],
             [8, x, y, 4] => self.registers[x as usize] = {
-                let sum = self.registers[x as usize] as u16 + self.registers[y as usize] as u16;
+                let mut sum = self.registers[x as usize] as u16 + self.registers[y as usize] as u16;
                 if sum > 255 {
+                    sum = sum - 255 - 1;
                     self.registers[0xF] = 1;
-                    (sum - 255 - 1) as u8
+                    sum as u8
                 } else {
                     self.registers[0xF] = 0;
                     sum as u8
@@ -269,25 +270,30 @@ impl Chip {
             },
             [8, x, y, 5] => self.registers[x as usize] = {
                 if self.registers[x as usize] >= self.registers[y as usize] {
+                    let diff = self.registers[x as usize] - self.registers[y as usize];
                     self.registers[0xF] = 1;
-                    self.registers[x as usize] - self.registers[y as usize]
+
+                    diff
                 } else {
                     let positive_diff = self.registers[y as usize] - self.registers[x as usize];
+                    let diff = 0xFF - positive_diff + 1;
                     self.registers[0xF] = 0;
-                    0xFF - positive_diff + 1
+
+                    diff
                 }
             },
             [8, x, _, 6] => {
                 let vx = self.registers[x as usize];
                 let lsb = vx & 1;
 
-                self.registers[0xF] = lsb;
                 self.registers[x as usize] = vx >> 1;
+                self.registers[0xF] = lsb;
             },
             [8, x, y, 7] => self.registers[x as usize] = {
                 if self.registers[y as usize] >= self.registers[x as usize] {
+                    let diff = self.registers[y as usize] - self.registers[x as usize];
                     self.registers[0xF] = 1;
-                    self.registers[y as usize] - self.registers[x as usize]
+                    diff
                 } else {
                     let positive_diff = self.registers[x as usize] - self.registers[y as usize];
                     self.registers[0xF] = 0;
@@ -298,8 +304,8 @@ impl Chip {
                 let vx = self.registers[x as usize];
                 let msb = (vx >> 7) & 1;
 
-                self.registers[0xF] = msb;
                 self.registers[x as usize] = vx << 1;
+                self.registers[0xF] = msb;
             },
             [9, x, y, 0] => {
                 if self.registers[x as usize] != self.registers[y as usize] {

@@ -76,9 +76,9 @@ impl Display {
             }
 
             starting_index += DISPLAY_WIDTH;
-            self.print();
         }
 
+        self.print();
         flipped_pixel_to_off
     }
 }
