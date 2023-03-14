@@ -55,6 +55,10 @@ impl Display {
 
             for offset in 0..8 {
                 let pixel_index = starting_index + offset;
+                if pixel_index >= 2048 {
+                    break;
+                }
+
                 let pixel_bit = (pixel_pattern >> 7 - offset) & 1;
                 let display_bit = self.get_pixel(pixel_index);
                 let new_value = match (pixel_bit, display_bit) {
@@ -67,10 +71,6 @@ impl Display {
                     },
                     _ => panic!("This wasn't supposed to happen: {} {}", pixel_bit, display_bit)
                 };
-
-                if pixel_index >= 2048 {
-                    continue;
-                }
 
                 self.set_pixel(pixel_index, new_value);
             }
