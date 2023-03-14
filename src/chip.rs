@@ -33,7 +33,7 @@ impl Timer {
 pub struct DecodedInstruction {
     nibbles: [u8; 4],
     nn: u8,
-    nnn: u16
+    nnn: usize
 }
 
 #[derive(Debug)]
@@ -85,8 +85,8 @@ impl Chip {
         self.pc = self.stack[self.stack_level];
     }
 
-    fn jump(&mut self, address: u16) {
-        self.pc = address as usize;
+    fn jump(&mut self, address: usize) {
+        self.pc = address;
     }
 
     fn call_at(&mut self, address: usize) {
@@ -116,11 +116,6 @@ impl Chip {
         self.registers[x as usize] = vx << 1;
     }
 
-    fn set_i_location_of_vx_character_sprite(&mut self, x: u8) {
-        println!("SETTING LOCATION OF I TO FONT_ADDR + V{}", x);
-        self.i = FONT_ADDR + (x as usize * font::FONT_SIZE);
-    }
-
     fn print_screen(&self) {
         for _ in 0..DISPLAY_WIDTH {
             print!("-");
@@ -136,7 +131,7 @@ impl Chip {
             println!("|");
         }
         for _ in 0..DISPLAY_WIDTH {
-            print!("-");
+             print!("-");
         }
         println!("");
     }
@@ -229,16 +224,16 @@ impl Chip {
     }
 
     fn store_registers_to_i(&mut self, x: u8) {
-        for register in 0..x {
-            let address = self.i + register as usize;
-            self.memory[address] = self.registers[register as usize];
+        for register in 0..x as usize {
+            let address = self.i + register;
+            self.memory[address] = self.registers[register];
         }
     }
 
     fn load_registers_to_i(&mut self, x: u8) {
-        for register in 0..x {
-            let address = self.i + register as usize;
-            self.registers[register as usize] = self.memory[address]
+        for register in 0..x as usize {
+            let address = self.i + register;
+            self.registers[register] = self.memory[address]
         }
     }
 
@@ -262,7 +257,7 @@ impl Chip {
         let nibbles = [first_nibble, second_nibble, third_nibble, fourth_nibble];
 
         let nn = (instruction & 0x00FF) as u8;
-        let nnn = instruction & 0x0FFF;
+        let nnn = (instruction & 0x0FFF) as usize;
 
         DecodedInstruction { nibbles, nn, nnn }
     }
@@ -331,8 +326,8 @@ impl Chip {
                     self.pc += 2
                 }
             },
-            [0xA, _, _, _] => self.i = decoded_instruction.nnn as usize,
-            [0xB, _, _, _] => self.pc = (self.registers[0] as u16 + decoded_instruction.nnn) as usize,
+            [0xA, _, _, _] => self.i = decoded_instruction.nnn,
+            [0xB, _, _, _] => self.pc = self.registers[0] as usize + decoded_instruction.nnn,
             [0xC, x, _, _] => self.set_vx_rand(x, decoded_instruction.nn),
             [0xD, x, y, n] => self.draw(x, y, n),
             [0xE, x, 0x9, 0xE] => self.skip_if_key_press(x),
@@ -342,7 +337,7 @@ impl Chip {
             [0xF, x, 0x1, 0x5] => self.delay_timer.set(self.registers[x as usize]),
             [0xF, x, 0x1, 0x8] => self.sound_timer.set(self.registers[x as usize]),
             [0xF, x, 0x1, 0xE] => self.i += self.registers[x as usize] as usize,
-            [0xF, x, 0x2, 0x9] => self.set_i_location_of_vx_character_sprite(x),
+            [0xF, x, 0x2, 0x9] => self.i = FONT_ADDR + (x as usize * font::FONT_SIZE),
             [0xF, x, 0x3, 0x3] => {
                 self.store_vx_binary_at_i(x);
             },
