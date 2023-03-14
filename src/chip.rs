@@ -100,22 +100,6 @@ impl Chip {
         self.registers[x as usize] = rand_number & seed;
     }
 
-    fn store_least_sig_vx_bit(&mut self, x: u8) {
-        let vx = self.registers[x as usize];
-        let lsb = vx & 1;
-
-        self.registers[0xF] = lsb;
-        self.registers[x as usize] = vx >> 1;
-    }
-
-    fn store_most_sig_vx_bit(&mut self, x: u8) {
-        let vx = self.registers[x as usize];
-        let msb = (vx >> 7) & 1;
-
-        self.registers[0xF] = msb;
-        self.registers[x as usize] = vx << 1;
-    }
-
     fn print_screen(&self) {
         for _ in 0..DISPLAY_WIDTH {
             print!("-");
@@ -318,9 +302,21 @@ impl Chip {
                     0xFF - positive_diff + 1
                 }
             },
-            [8, x, _, 6] => self.store_least_sig_vx_bit(x),
+            [8, x, _, 6] => {
+                let vx = self.registers[x as usize];
+                let lsb = vx & 1;
+
+                self.registers[0xF] = lsb;
+                self.registers[x as usize] = vx >> 1;
+            },
             [8, x, y, 7] => self.registers[x as usize] = self.registers[y as usize] - self.registers[x as usize],
-            [8, x, _, 0xE] => self.store_most_sig_vx_bit(x),
+            [8, x, _, 0xE] => {
+                let vx = self.registers[x as usize];
+                let msb = (vx >> 7) & 1;
+
+                self.registers[0xF] = msb;
+                self.registers[x as usize] = vx << 1;
+            },
             [9, x, y, 0] => {
                 if self.registers[x as usize] != self.registers[y as usize] {
                     self.pc += 2
@@ -422,7 +418,7 @@ mod tests {
 
 
     #[test]
-    fn fetch_gets_two_byte_instruction_at_pc() {
+    fn fetch_gets_two_byte_instruction_and_increments_pc() {
         let mut chip = Chip::new();
         chip.pc = 30;
 
@@ -432,15 +428,6 @@ mod tests {
         let instruction = chip.fetch();
 
         assert_eq!(instruction, 0xABCD);
-    }
-
-    #[test]
-    fn fetch_increments_pc_by_2() {
-        let mut chip = Chip::new();
-        chip.pc = 30;
-
-        chip.fetch();
-
         assert_eq!(chip.pc, 32);
     }
 
@@ -498,51 +485,79 @@ mod tests {
     }
 
     #[test]
-    fn store_most_sig_vx_bit_1() {
+    fn test_8xye_store_vx_most_sig_bit_into_vf_1() {
+        let vx: usize = 0x8;
+        let vf: usize = 0xF;
         let mut chip = Chip::new();
-        chip.registers[8] = 0b10000001;
+        let decoded_instruction = DecodedInstruction {
+            nibbles: [0x8, vx as u8, 0x0, 0xE],
+            nn: 0x0E,
+            nnn: 0x80E
+        };
+        chip.registers[vx] = 0b10000001;
+        chip.registers[vf] = 0x00;
 
-        assert_eq!(chip.registers[0xF], 0);
+        chip.execute(decoded_instruction);
 
-        chip.store_most_sig_vx_bit(8);
-
-        assert_eq!(chip.registers[0x8], 0b00000010);
-        assert_eq!(chip.registers[0xF], 1);
+        assert_eq!(chip.registers[vx], 0b00000010);
+        assert_eq!(chip.registers[vf], 0x1); // Carry flag is unchanged
     }
 
     #[test]
-    fn store_most_sig_vx_bit_0() {
+    fn test_8xye_store_vx_most_sig_bit_into_vf_0() {
+        let vx: usize = 0x8;
+        let vf: usize = 0xF;
         let mut chip = Chip::new();
-        chip.registers[8] = 0b01111111;
+        let decoded_instruction = DecodedInstruction {
+            nibbles: [0x8, vx as u8, 0x0, 0xE],
+            nn: 0x0E,
+            nnn: 0x80E
+        };
+        chip.registers[vx] = 0b01111111;
+        chip.registers[vf] = 0x00;
 
-        chip.store_most_sig_vx_bit(8);
+        chip.execute(decoded_instruction);
 
-        assert_eq!(chip.registers[0x8], 0b11111110);
-        assert_eq!(chip.registers[0xF], 0);
+        assert_eq!(chip.registers[vx], 0b11111110);
+        assert_eq!(chip.registers[vf], 0x0);
     }
 
     #[test]
-    fn store_least_sig_vx_bit_1() {
+    fn test_8xy6_store_vx_least_sig_bit_into_vf_1() {
+        let vx: usize = 0x2;
+        let vf: usize = 0xF;
         let mut chip = Chip::new();
-        chip.registers[0xA] = 0b11111101;
+        let decoded_instruction = DecodedInstruction {
+            nibbles: [0x8, vx as u8, 0x0, 0x6],
+            nn: 0x06,
+            nnn: 0x806
+        };
+        chip.registers[vx] = 0b11111101;
+        chip.registers[vf] = 0x00;
 
-        assert_eq!(chip.registers[0xF], 0);
+        chip.execute(decoded_instruction);
 
-        chip.store_least_sig_vx_bit(0xA);
-
-        assert_eq!(chip.registers[0xA], 0b01111110);
-        assert_eq!(chip.registers[0xF], 1);
+        assert_eq!(chip.registers[vx], 0b01111110);
+        assert_eq!(chip.registers[vf], 1);
     }
 
     #[test]
-    fn store_least_sig_vx_bit_0() {
+    fn test_8xy6_store_vx_least_sig_bit_into_vf_0() {
+        let vx: usize = 0x2;
+        let vf: usize = 0xF;
         let mut chip = Chip::new();
-        chip.registers[0xB] = 0b10000010;
+        let decoded_instruction = DecodedInstruction {
+            nibbles: [0x8, vx as u8, 0x0, 0x6],
+            nn: 0x06,
+            nnn: 0x806
+        };
+        chip.registers[vx] = 0b10000010;
+        chip.registers[vf] = 0x00;
 
-        chip.store_least_sig_vx_bit(0xB);
+        chip.execute(decoded_instruction);
 
-        assert_eq!(chip.registers[0xB], 0b01000001);
-        assert_eq!(chip.registers[0xF], 0);
+        assert_eq!(chip.registers[vx], 0b01000001);
+        assert_eq!(chip.registers[vf], 0);
     }
 
     #[test]
