@@ -332,11 +332,20 @@ impl Chip {
                     let address = self.i + register;
                     self.memory[address] = self.registers[register];
                 }
+
+                // CHIP-8 updates I to the end of the stored registers
+                if self.chip_type == "CHIP-8" {
+                    self.i = self.i + x as usize;
+                }
             },
             [0xF, x, 0x6, 0x5] => {
                 for register in 0..=x as usize {
                     let address = self.i + register;
                     self.registers[register] = self.memory[address]
+                }
+
+                if self.chip_type == "CHIP-8" {
+                    self.i = self.i + x as usize;
                 }
             },
             _ => ()
