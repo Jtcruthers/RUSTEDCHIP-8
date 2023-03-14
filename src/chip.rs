@@ -236,9 +236,18 @@ impl Chip {
                 }
             },
             [8, x, y, 0] => self.registers[x as usize] = self.registers[y as usize],
-            [8, x, y, 1] => self.registers[x as usize] = self.registers[x as usize] | self.registers[y as usize],
-            [8, x, y, 2] => self.registers[x as usize] = self.registers[x as usize] & self.registers[y as usize],
-            [8, x, y, 3] => self.registers[x as usize] = self.registers[x as usize] ^ self.registers[y as usize],
+            [8, x, y, 1] => {
+                self.registers[x as usize] = self.registers[x as usize] | self.registers[y as usize];
+                self.registers[0xF] = 0;
+            },
+            [8, x, y, 2] => {
+                self.registers[x as usize] = self.registers[x as usize] & self.registers[y as usize];
+                self.registers[0xF] = 0;
+            },
+            [8, x, y, 3] => {
+                self.registers[x as usize] = self.registers[x as usize] ^ self.registers[y as usize];
+                self.registers[0xF] = 0;
+            },
             [8, x, y, 4] => self.registers[x as usize] = {
                 let mut sum = self.registers[x as usize] as u16 + self.registers[y as usize] as u16;
                 if sum > 255 {
@@ -922,6 +931,8 @@ mod tests {
 
         assert_eq!(chip.registers[vx], 0b00000010);
         assert_eq!(chip.registers[vf], 0x1); // Carry flag is unchanged
+                                             //TODO - This is the super8 impl. Need to also do
+                                             //chip-8 impl only
     }
 
     #[test]
