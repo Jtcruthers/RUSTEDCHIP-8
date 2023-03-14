@@ -332,10 +332,16 @@ impl Chip {
         }
     }
 
+    fn check_timers(&mut self) {
+        self.delay_timer.check_decrement();
+        self.sound_timer.check_decrement();
+    }
+
     pub fn step(&mut self) {
         let instruction = self.fetch();
         let decoded_instruction = self.decode(instruction);
         self.execute(decoded_instruction);
+        self.check_timers();
     }
 
     pub fn load_rom(&mut self, rom: &Vec<u8>) {
