@@ -313,7 +313,7 @@ impl Chip {
         }
     }
 
-    fn step(&mut self) {
+    pub fn step(&mut self) {
         let instruction = self.fetch();
         let decoded_instruction = self.decode(instruction);
         self.execute(decoded_instruction);
@@ -323,21 +323,6 @@ impl Chip {
         for (offset, byte) in rom.iter().enumerate() {
             self.memory[ROM_ADDR + offset] = *byte;
             self.pc = ROM_ADDR;
-        }
-    }
-
-    pub fn run(&mut self, rom: &Vec<u8>) {
-        //Put the passed rom 
-        self.load_rom(rom);
-
-        print!("MEMORY: [");
-        for b in self.memory {
-            print!("{:#X} ", b)
-        }
-        println!("]");
-
-        loop {
-            self.step()
         }
     }
 }
