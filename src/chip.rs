@@ -24,7 +24,8 @@ pub struct Chip {
     pub delay_timer: Timer,
     pub sound_timer: Timer,
     pub i: usize,
-    pub pc: usize
+    pub pc: usize,
+    pub chip_type: String
 }
 
 impl Chip {
@@ -38,7 +39,8 @@ impl Chip {
             delay_timer: Timer::new(TIMER_HZ),
             sound_timer: Timer::new(TIMER_HZ),
             i: 0,
-            pc: 0
+            pc: 0,
+            chip_type: "CHIP-8".to_string()
         };
 
         let font = font::get_font();
