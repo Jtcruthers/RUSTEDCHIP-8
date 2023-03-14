@@ -1,14 +1,11 @@
 use rand::Rng;
 use crate::font;
+use crate::display::{Display, DISPLAY_WIDTH};
 use std::process;
 
-const DISPLAY_WIDTH: usize = 64;
-const DISPLAY_HEIGHT: usize = 32;
-const DISPLAY_SIZE: usize = DISPLAY_WIDTH * DISPLAY_HEIGHT;
 const FONT_ADDR: usize = 0x050;
 const ROM_ADDR: usize = 0x200;
 
-#[derive(Debug)]
 pub struct Timer {
     value: u8
 }
@@ -29,20 +26,18 @@ impl Timer {
     }
 }
 
-#[derive(Debug)]
 pub struct DecodedInstruction {
     nibbles: [u8; 4],
     nn: u8,
     nnn: usize
 }
 
-#[derive(Debug)]
 pub struct Chip {
     pub memory: [u8; 4096],
     pub registers: [u8; 16],
     pub stack: [usize; 32],
     pub stack_level: usize,
-    pub display: [bool; DISPLAY_SIZE],
+    pub display: Display,
     pub delay_timer: Timer,
     pub sound_timer: Timer,
     pub i: usize,
@@ -55,7 +50,7 @@ impl Chip {
             memory: [0; 4096],
             stack: [0; 32],
             stack_level: 0,
-            display: [false; DISPLAY_SIZE],
+            display: Display::new(),
             registers: [0; 16],
             delay_timer: Timer::new(),
             sound_timer: Timer::new(),
@@ -72,7 +67,7 @@ impl Chip {
     }
 
     fn clear_display(&mut self) {
-        self.display = [false; DISPLAY_SIZE];
+        self.display.clear();
     }
 
     fn handle_return(&mut self) {
@@ -100,26 +95,6 @@ impl Chip {
         self.registers[x as usize] = rand_number & seed;
     }
 
-    fn print_screen(&self) {
-        for _ in 0..DISPLAY_WIDTH {
-            print!("-");
-        }
-        println!("");
-        for row in 0..DISPLAY_HEIGHT {
-            print!("|");
-            for column in 0..DISPLAY_WIDTH {
-                let pixel = DISPLAY_WIDTH * row + column;
-                let sprite = if self.display[pixel] == true { "X" } else { " "};
-                print!("{}", sprite);
-            }
-            println!("|");
-        }
-        for _ in 0..DISPLAY_WIDTH {
-             print!("-");
-        }
-        println!("");
-    }
-
     //Draw sprite at coord (x, y) that is 8 pixels wide and the height arg tall
     fn draw(&mut self, x: u8, y:u8, height: u8) {
         let vx = self.registers[x as usize] as usize;
@@ -140,23 +115,17 @@ impl Chip {
                     continue;
                 }
 
-                if pixel_index >= DISPLAY_WIDTH * (row as usize + 1) {
-                    println!("{} {} SKIPPING THIS ONE: {} - {} {}", x, y, pixel_index, row, offset);
-                } else {
-                    println!("{} {} DRAWING: {} - {} {}", x, y, pixel_index, row, offset);
-                }
-
                 // set VF to 1 if any screen pixels are flipped from set to unset when sprite is drawn
-                if self.display[pixel_index] == true && pixel_bit == 0 {
+                if self.display.get_pixel(pixel_index) == true && pixel_bit == 0 {
                     self.registers[0xF] = 1; 
                 }
-                self.display[pixel_index] = pixel_bit == 1;
+                self.display.set_pixel(pixel_index, pixel_bit == 1);
             }
 
             starting_index += DISPLAY_WIDTH;
         }
 
-            self.print_screen();
+        self.display.print();
     }
 
     fn skip_if_key_press(&mut self, _x: u8) { }
@@ -350,7 +319,7 @@ impl Chip {
         self.execute(decoded_instruction);
     }
 
-    fn load_rom(&mut self, rom: &Vec<u8>) {
+    pub fn load_rom(&mut self, rom: &Vec<u8>) {
         for (offset, byte) in rom.iter().enumerate() {
             self.memory[ROM_ADDR + offset] = *byte;
             self.pc = ROM_ADDR;
@@ -374,6 +343,9 @@ impl Chip {
 }
 
 #[cfg(test)]
+use crate::display::DISPLAY_SIZE;
+
+#[cfg(test)]
 mod tests {
     use super::*;
 
@@ -394,12 +366,6 @@ mod tests {
         for stack_frame in chip.stack.iter() {
             assert_eq!(*stack_frame, 0x00000000)
         }
-    }
-
-    #[test]
-    fn initial_display_is_64_by_32_pixels_all_empty() {
-        let chip = Chip::new();
-        assert_eq!(chip.display, [false; 64 * 32]);
     }
 
     #[test]
@@ -491,12 +457,12 @@ mod tests {
     #[test]
     fn test_00e0_clear_display() {
         let mut chip = Chip::new();
-        chip.display = [true; DISPLAY_SIZE];
+        chip.display.display = [true; DISPLAY_SIZE];
 
         let decoded_instruction = chip.decode(0x00E0);
         chip.execute(decoded_instruction);
 
-        assert_eq!(chip.display, [false; DISPLAY_SIZE]);
+        assert_eq!(chip.display.display, [false; DISPLAY_SIZE]);
     }
 
     #[test]

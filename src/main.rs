@@ -2,6 +2,7 @@ use std::{env, fs};
 
 mod chip;
 mod font;
+mod display;
 
 fn read_rom(rom_name: &String) -> Vec<u8> {
     fs::read(rom_name).expect("Cant read the rom")
