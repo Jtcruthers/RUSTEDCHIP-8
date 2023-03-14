@@ -1,6 +1,7 @@
 use rand::Rng;
 use crate::font;
 use crate::display::{Display, DISPLAY_WIDTH};
+use device_query::{DeviceQuery, DeviceState, Keycode};
 use std::process;
 
 const FONT_ADDR: usize = 0x050;
@@ -128,41 +129,85 @@ impl Chip {
         self.display.print();
     }
 
-    fn skip_if_key_press(&mut self, _x: u8) { }
+    fn skip_if_key_press(&mut self, x: u8) {
+        let device_state = DeviceState::new();
+        let keys: Vec<Keycode> = device_state.get_keys();
+        let vx_keycode = self.hex_to_keycode(self.registers[x as usize]);
 
-    fn skip_if_not_key_press(&mut self, _x: u8) { }
+        if keys.contains(&vx_keycode) {
+            self.pc = self.pc + 2;
+        }
+    }
 
-    fn keypress_to_value(&self, keypress: String) -> u8 {
-        match keypress.trim() {
-            "0" => 0x0,
-            "1" => 0x1,
-            "2" => 0x2,
-            "3" => 0x3,
-            "4" => 0x4,
-            "5" => 0x5,
-            "6" => 0x6,
-            "7" => 0x7,
-            "8" => 0x8,
-            "9" => 0x9,
-            "a" => 0xA,
-            "b" => 0xB,
-            "c" => 0xC,
-            "d" => 0xD,
-            "e" => 0xE,
-            "f" => 0xF,
-            _ => panic!("UNKNOWN KEY")
+    fn skip_if_not_key_press(&mut self, x: u8) {
+        let device_state = DeviceState::new();
+        let keys: Vec<Keycode> = device_state.get_keys();
+        let vx_keycode = self.hex_to_keycode(self.registers[x as usize]);
+
+        if !keys.contains(&vx_keycode) {
+            self.pc = self.pc + 2;
+        }
+    }
+
+    fn hex_to_keycode(&self, keypress: u8) -> Keycode {
+        match keypress {
+            0x1 => Keycode::Key1,
+            0x2 => Keycode::Key2,
+            0x3 => Keycode::Key3,
+            0x4 => Keycode::Q,
+            0x5 => Keycode::W,
+            0x6 => Keycode::E,
+            0x7 => Keycode::A,
+            0x8 => Keycode::S,
+            0x9 => Keycode::D,
+            0xA => Keycode::Z,
+            0x0 => Keycode::X,
+            0xB => Keycode::C,
+            0xC => Keycode::Key4,
+            0xD => Keycode::R,
+            0xE => Keycode::F,
+            0xF => Keycode::V,
+            _ => {
+                println!("UNKNOWN KEY");
+                Keycode::D
+            }
+        }
+    }
+
+    fn keycode_to_hex(&self, keypress: Keycode) -> u8 {
+        match keypress {
+            Keycode::Key1 => 0x1,
+            Keycode::Key2 => 0x2,
+            Keycode::Key3 => 0x3,
+            Keycode::Q => 0x4,
+            Keycode::W => 0x5,
+            Keycode::E => 0x6,
+            Keycode::A => 0x7,
+            Keycode::S => 0x8,
+            Keycode::D => 0x9,
+            Keycode::Z => 0xA,
+            Keycode::X => 0x0,
+            Keycode::C => 0xB,
+            Keycode::Key4 => 0xC,
+            Keycode::R => 0xD,
+            Keycode::F => 0xE,
+            Keycode::V => 0xF,
+            _ => {
+                println!("UNKNOWN KEY");
+                0xD
+            }
         }
     }
 
     fn await_then_store_keypress(&mut self, x: u8) {
-        //TODO - do not require hitting enter
-        //TODO - be able to map keyboard keys to the hex keyboard
-        let mut line = String::new();
-        std::io::stdin().read_line(&mut line).expect("Failed to read line");
-
-        let keypress_value = self.keypress_to_value(line);
-
-        self.registers[x as usize] = keypress_value
+        let device_state = DeviceState::new();
+        loop {
+            let keys: Vec<Keycode> = device_state.get_keys();
+            if keys.len() > 0 {
+                self.registers[x as usize] = self.keycode_to_hex(keys[0]);
+                break;
+            }
+        }
     }
 
     fn fetch(&mut self) -> u16 {
@@ -948,6 +993,17 @@ mod tests {
         chip.execute(decoded_instruction);
 
         assert_eq!(chip.pc, 0xACB);
+    }
+
+    #[test]
+    fn test_ex9e_skip_if_vx_key_is_pressed() {
+        let mut chip = Chip::new();
+        chip.pc = 0x200;
+
+        let decoded_instruction = chip.decode(0xEA9E);
+        chip.execute(decoded_instruction);
+
+        assert_eq!(chip.pc, 0x200);
     }
 
     #[test]
