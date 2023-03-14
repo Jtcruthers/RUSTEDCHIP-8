@@ -284,7 +284,16 @@ impl Chip {
                 self.registers[0xF] = lsb;
                 self.registers[x as usize] = vx >> 1;
             },
-            [8, x, y, 7] => self.registers[x as usize] = self.registers[y as usize] - self.registers[x as usize],
+            [8, x, y, 7] => self.registers[x as usize] = {
+                if self.registers[y as usize] >= self.registers[x as usize] {
+                    self.registers[0xF] = 1;
+                    self.registers[y as usize] - self.registers[x as usize]
+                } else {
+                    let positive_diff = self.registers[x as usize] - self.registers[y as usize];
+                    self.registers[0xF] = 0;
+                    0xFF - positive_diff + 1
+                }
+            },
             [8, x, _, 0xE] => {
                 let vx = self.registers[x as usize];
                 let msb = (vx >> 7) & 1;
@@ -308,7 +317,7 @@ impl Chip {
             [0xF, x, 0x1, 0x5] => self.delay_timer.set(self.registers[x as usize]),
             [0xF, x, 0x1, 0x8] => self.sound_timer.set(self.registers[x as usize]),
             [0xF, x, 0x1, 0xE] => self.i += self.registers[x as usize] as usize,
-            [0xF, x, 0x2, 0x9] => self.i = FONT_ADDR + (x as usize * font::FONT_SIZE),
+            [0xF, x, 0x2, 0x9] => self.i = FONT_ADDR + (self.registers[x as usize] as usize * font::FONT_SIZE),
             [0xF, x, 0x3, 0x3] => {
                 let number = self.registers[x as usize];
                 let ones = number % 10;
@@ -388,15 +397,9 @@ mod tests {
     }
 
     #[test]
-    fn initial_display_is_64_by_32_pixels() {
+    fn initial_display_is_64_by_32_pixels_all_empty() {
         let chip = Chip::new();
-        assert_eq!(chip.display.len(), 64 * 32);
-    }
-
-    #[test]
-    fn initial_display_is_all_false() {
-        let chip = Chip::new();
-        assert_eq!(chip.display.iter().all(|pixel| *pixel == false), true);
+        assert_eq!(chip.display, [false; 64 * 32]);
     }
 
     #[test]
@@ -486,6 +489,150 @@ mod tests {
     }
 
     #[test]
+    fn test_00e0_clear_display() {
+        let mut chip = Chip::new();
+        chip.display = [true; DISPLAY_SIZE];
+
+        let decoded_instruction = chip.decode(0x00E0);
+        chip.execute(decoded_instruction);
+
+        assert_eq!(chip.display, [false; DISPLAY_SIZE]);
+    }
+
+    #[test]
+    fn test_00ee_return_from_subroutine() {
+        let mut chip = Chip::new();
+        chip.pc = 0x500;
+        chip.stack[0] = 0x250;
+        chip.stack_level = 1;
+
+        let decoded_instruction = chip.decode(0x00EE);
+        chip.execute(decoded_instruction);
+
+        assert_eq!(chip.pc, 0x250);
+        assert_eq!(chip.stack_level, 0);
+    }
+
+    #[test]
+    fn test_1nnn_jump() {
+        let mut chip = Chip::new();
+        chip.pc = 0x250;
+
+        let decoded_instruction = chip.decode(0x1ABC);
+        chip.execute(decoded_instruction);
+
+        assert_eq!(chip.pc, 0xABC);
+    }
+
+    #[test]
+    fn test_2nnn_call_subroutine_at_nnn() {
+        let mut chip = Chip::new();
+        chip.pc = 0x250;
+
+        let decoded_instruction = chip.decode(0x2ABC);
+        chip.execute(decoded_instruction);
+
+        assert_eq!(chip.pc, 0xABC);
+        assert_eq!(chip.stack[0], 0x250);
+    }
+
+    #[test]
+    fn test_3xnn_skip_if_vx_equal_nn_dont_skip() {
+        let mut chip = Chip::new();
+        chip.pc = 0x250;
+        chip.registers[0xA] = 0xAA;
+
+        let decoded_instruction = chip.decode(0x3A00);
+        chip.execute(decoded_instruction);
+
+        assert_eq!(chip.pc, 0x250);
+    }
+
+    #[test]
+    fn test_3xnn_skip_if_vx_equal_nn_skip() {
+        let mut chip = Chip::new();
+        chip.pc = 0x250;
+        chip.registers[0xA] = 0xAA;
+
+        let decoded_instruction = chip.decode(0x3AAA);
+        chip.execute(decoded_instruction);
+
+        assert_eq!(chip.pc, 0x252);
+    }
+
+    #[test]
+    fn test_4xnn_skip_if_vx_not_equal_nn_dont_skip() {
+        let mut chip = Chip::new();
+        chip.pc = 0x250;
+        chip.registers[0xA] = 0xAA;
+
+        let decoded_instruction = chip.decode(0x4AAA);
+        chip.execute(decoded_instruction);
+
+        assert_eq!(chip.pc, 0x250);
+    }
+
+    #[test]
+    fn test_4xnn_skip_if_vx_not_equal_nn_skip() {
+        let mut chip = Chip::new();
+        chip.pc = 0x250;
+        chip.registers[0xA] = 0xAA;
+
+        let decoded_instruction = chip.decode(0x4A00);
+        chip.execute(decoded_instruction);
+
+        assert_eq!(chip.pc, 0x252);
+    }
+
+    #[test]
+    fn test_5xy0_skip_if_vx_equal_vy_dont_skip() {
+        let mut chip = Chip::new();
+        chip.pc = 0x250;
+        chip.registers[0xA] = 0xAA;
+        chip.registers[0xB] = 0xBB;
+
+        let decoded_instruction = chip.decode(0x5AB0);
+        chip.execute(decoded_instruction);
+
+        assert_eq!(chip.pc, 0x250);
+    }
+
+    #[test]
+    fn test_5xy0_skip_if_vx_equal_vy_skip() {
+        let mut chip = Chip::new();
+        chip.pc = 0x250;
+        chip.registers[0xA] = 0xAA;
+        chip.registers[0xB] = 0xAA;
+
+        let decoded_instruction = chip.decode(0x5AB0);
+        chip.execute(decoded_instruction);
+
+        assert_eq!(chip.pc, 0x252);
+    }
+
+    #[test]
+    fn test_6xnn_set_vx_to_nn_00() {
+        let mut chip = Chip::new();
+        chip.registers[0xA] = 0x0;
+
+        let decoded_instruction = chip.decode(0x6A00);
+        chip.execute(decoded_instruction);
+
+        assert_eq!(chip.registers[0xA], 0x00);
+    }
+
+    #[test]
+    fn test_6xnn_set_vx_to_nn_ff() {
+        let mut chip = Chip::new();
+        chip.registers[0xA] = 0x0;
+
+        let decoded_instruction = chip.decode(0x6AFF);
+        chip.execute(decoded_instruction);
+
+        assert_eq!(chip.registers[0xA], 0xFF);
+    }
+
+    #[test]
     fn test_7xnn_add_vx_and_nn() {
         let vx: usize = 0x3;
         let vf: usize = 0xF;
@@ -515,6 +662,141 @@ mod tests {
         // 0xF0 + 0xF0 = 0x1E0 --> only 8 bits, so its just 0xE0
         assert_eq!(chip.registers[vx], 0xE0);
         assert_eq!(chip.registers[vf], 0x0); // Carry flag is unchanged
+    }
+
+    #[test]
+    fn test_8xy0_set_vx_to_value_of_vy() {
+        let vx: usize = 0xA;
+        let vy: usize = 0xB;
+        let mut chip = Chip::new();
+        chip.registers[vx] = 0xF0;
+        chip.registers[vy] = 0x0F;
+
+        let decoded_instruction = chip.decode(0x8AB0);
+        chip.execute(decoded_instruction);
+
+        assert_eq!(chip.registers[vx], 0x0F);
+        assert_eq!(chip.registers[vy], 0x0F); // VY is unchanged
+    }
+
+    #[test]
+    fn test_8xy1_set_vx_to_vx_bitwise_or_vy_none() {
+        let vx: usize = 0xA;
+        let vy: usize = 0xB;
+        let mut chip = Chip::new();
+        chip.registers[vx] = 0x00;
+        chip.registers[vy] = 0x00;
+
+        let decoded_instruction = chip.decode(0x8AB1);
+        chip.execute(decoded_instruction);
+
+        assert_eq!(chip.registers[vx], 0x00);
+        assert_eq!(chip.registers[vy], 0x00); // VY is unchanged
+    }
+
+    #[test]
+    fn test_8xy1_set_vx_to_vx_bitwise_or_vy_all() {
+        let vx: usize = 0xA;
+        let vy: usize = 0xB;
+        let mut chip = Chip::new();
+        chip.registers[vx] = 0xF0;
+        chip.registers[vy] = 0x0F;
+
+        let decoded_instruction = chip.decode(0x8AB1);
+        chip.execute(decoded_instruction);
+
+        assert_eq!(chip.registers[vx], 0xFF);
+        assert_eq!(chip.registers[vy], 0x0F); // VY is unchanged
+    }
+
+    #[test]
+    fn test_8xy2_set_vx_to_vx_bitwise_and_vy_none() {
+        let vx: usize = 0xA;
+        let vy: usize = 0xB;
+        let mut chip = Chip::new();
+        chip.registers[vx] = 0xF0;
+        chip.registers[vy] = 0x0F;
+
+        let decoded_instruction = chip.decode(0x8AB2);
+        chip.execute(decoded_instruction);
+
+        assert_eq!(chip.registers[vx], 0x00);
+        assert_eq!(chip.registers[vy], 0x0F); // VY is unchanged
+    }
+
+    #[test]
+    fn test_8xy2_set_vx_to_vx_bitwise_and_vy_some() {
+        let vx: usize = 0xA;
+        let vy: usize = 0xB;
+        let mut chip = Chip::new();
+        chip.registers[vx] = 0xF2;
+        chip.registers[vy] = 0x18;
+
+        let decoded_instruction = chip.decode(0x8AB2);
+        chip.execute(decoded_instruction);
+
+        assert_eq!(chip.registers[vx], 0x10);
+        assert_eq!(chip.registers[vy], 0x18); // VY is unchanged
+    }
+
+    #[test]
+    fn test_8xy2_set_vx_to_vx_bitwise_and_vy_all() {
+        let vx: usize = 0xA;
+        let vy: usize = 0xB;
+        let mut chip = Chip::new();
+        chip.registers[vx] = 0xFF;
+        chip.registers[vy] = 0xFF;
+
+        let decoded_instruction = chip.decode(0x8AB2);
+        chip.execute(decoded_instruction);
+
+        assert_eq!(chip.registers[vx], 0xFF);
+        assert_eq!(chip.registers[vy], 0xFF); // VY is unchanged
+    }
+
+    #[test]
+    fn test_8xy3_set_vx_to_vx_bitwise_xor_vy_none() {
+        let vx: usize = 0xA;
+        let vy: usize = 0xB;
+        let mut chip = Chip::new();
+        chip.registers[vx] = 0xFF;
+        chip.registers[vy] = 0xFF;
+
+        let decoded_instruction = chip.decode(0x8AB3);
+        chip.execute(decoded_instruction);
+
+        assert_eq!(chip.registers[vx], 0x00);
+        assert_eq!(chip.registers[vy], 0xFF); // VY is unchanged
+    }
+
+    #[test]
+    fn test_8xy3_set_vx_to_vx_bitwise_xor_vy_some() {
+        let vx: usize = 0xA;
+        let vy: usize = 0xB;
+        let mut chip = Chip::new();
+        chip.registers[vx] = 0xF2;
+        chip.registers[vy] = 0x18;
+
+        let decoded_instruction = chip.decode(0x8AB3);
+        chip.execute(decoded_instruction);
+
+        assert_eq!(chip.registers[vx], 0xEA);
+        assert_eq!(chip.registers[vy], 0x18); // VY is unchanged
+    }
+
+    #[test]
+    fn test_8xy3_set_vx_to_vx_bitwise_xor_vy_all() {
+        let vx: usize = 0xA;
+        let vy: usize = 0xB;
+        let mut chip = Chip::new();
+        chip.registers[vx] = 0xF0;
+        chip.registers[vy] = 0x0F;
+
+        let decoded_instruction = chip.decode(0x8AB3);
+        chip.execute(decoded_instruction);
+
+        assert_eq!(chip.registers[vx], 0xFF);
+        assert_eq!(chip.registers[vy], 0x0F); // VY is unchanged
     }
 
     #[test]
@@ -588,6 +870,70 @@ mod tests {
     }
 
     #[test]
+    fn test_8xy6_store_vx_least_sig_bit_into_vf_1() {
+        let vx: usize = 0xA;
+        let vf: usize = 0xF;
+        let mut chip = Chip::new();
+        chip.registers[vx] = 0b11111101;
+        chip.registers[vf] = 0x00;
+
+        let decoded_instruction = chip.decode(0x8AB6);
+        chip.execute(decoded_instruction);
+
+        assert_eq!(chip.registers[vx], 0b01111110);
+        assert_eq!(chip.registers[vf], 1);
+    }
+
+    #[test]
+    fn test_8xy6_store_vx_least_sig_bit_into_vf_0() {
+        let vx: usize = 0xA;
+        let vf: usize = 0xF;
+        let mut chip = Chip::new();
+        chip.registers[vx] = 0b10000010;
+        chip.registers[vf] = 0x00;
+
+        let decoded_instruction = chip.decode(0x8AB6);
+        chip.execute(decoded_instruction);
+
+        assert_eq!(chip.registers[vx], 0b01000001);
+        assert_eq!(chip.registers[vf], 0);
+    }
+
+    #[test]
+    fn test_8xy7_set_vx_to_vy_minux_vx() {
+        let vx = 0xA;
+        let vy = 0xB;
+        let vf = 0xF;
+        let mut chip = Chip::new();
+        chip.registers[vx as usize] = 0x0F;
+        chip.registers[vy as usize] = 0xFF;
+
+        let decoded_instruction = chip.decode(0x8AB7);
+        chip.execute(decoded_instruction);
+
+        assert_eq!(chip.registers[vx as usize], 0xF0);
+        assert_eq!(chip.registers[vy as usize], 0xFF); // VY is unchanged
+        assert_eq!(chip.registers[vf as usize], 0x1); // Carry flag set due to no borrow
+    }
+
+    #[test]
+    fn test_8xy7_set_vx_to_vy_minux_vx_underflow() {
+        let vx = 0xA;
+        let vy = 0xB;
+        let vf = 0xF;
+        let mut chip = Chip::new();
+        chip.registers[vx as usize] = 0xFF;
+        chip.registers[vy as usize] = 0x0F;
+
+        let decoded_instruction = chip.decode(0x8AB7);
+        chip.execute(decoded_instruction);
+
+        assert_eq!(chip.registers[vx as usize], 0x10);
+        assert_eq!(chip.registers[vy as usize], 0x0F); // VY is unchanged
+        assert_eq!(chip.registers[vf as usize], 0x0); // Carry flag not set due to the borrow
+    }
+
+    #[test]
     fn test_8xye_store_vx_most_sig_bit_into_vf_1() {
         let vx: usize = 0xA;
         let vf: usize = 0xF;
@@ -618,33 +964,139 @@ mod tests {
     }
 
     #[test]
-    fn test_8xy6_store_vx_least_sig_bit_into_vf_1() {
-        let vx: usize = 0xA;
-        let vf: usize = 0xF;
+    fn test_9xy0_skip_if_vx_not_equal_vy_skip() {
         let mut chip = Chip::new();
-        chip.registers[vx] = 0b11111101;
-        chip.registers[vf] = 0x00;
+        chip.pc = 0x250;
+        chip.registers[0xA] = 0xAA;
+        chip.registers[0xB] = 0x00;
 
-        let decoded_instruction = chip.decode(0x8AB6);
+        let decoded_instruction = chip.decode(0x9AB0);
         chip.execute(decoded_instruction);
 
-        assert_eq!(chip.registers[vx], 0b01111110);
-        assert_eq!(chip.registers[vf], 1);
+        assert_eq!(chip.pc, 0x252);
     }
 
     #[test]
-    fn test_8xy6_store_vx_least_sig_bit_into_vf_0() {
-        let vx: usize = 0xA;
-        let vf: usize = 0xF;
+    fn test_annn_set_i_to_nnn() {
         let mut chip = Chip::new();
-        chip.registers[vx] = 0b10000010;
-        chip.registers[vf] = 0x00;
+        chip.i = 0;
 
-        let decoded_instruction = chip.decode(0x8AB6);
+        let decoded_instruction = chip.decode(0xABED);
         chip.execute(decoded_instruction);
 
-        assert_eq!(chip.registers[vx], 0b01000001);
-        assert_eq!(chip.registers[vf], 0);
+        assert_eq!(chip.i, 0xBED);
+    }
+
+    #[test]
+    fn test_bnnn_jump_to_nnn_plus_v0() {
+        let mut chip = Chip::new();
+        chip.pc = 0x200;
+        chip.registers[0] = 0xF;
+
+        let decoded_instruction = chip.decode(0xBABC);
+        chip.execute(decoded_instruction);
+
+        assert_eq!(chip.pc, 0xACB);
+    }
+
+    #[test]
+    fn test_fx07_set_vx_to_delay_timers_value() {
+        let mut chip = Chip::new();
+        let vx = 0xA;
+        chip.registers[vx] = 0;
+        chip.delay_timer.value = 30;
+
+        let decoded_instruction = chip.decode(0xFA07);
+        chip.execute(decoded_instruction);
+
+        assert_eq!(chip.registers[vx], 30);
+    }
+
+    /* Commenting out since you have to type, but it did allow me to test manually
+     * There has to a better way to test this, or even yet a better way to get the input
+    #[test]
+    fn test_fx0a_await_then_store_keypress_in_vx() {
+        let mut chip = Chip::new();
+        let vx = 0xA;
+
+        let decoded_instruction = chip.decode(0xFA0A);
+        chip.execute(decoded_instruction); // Have to press E and enter
+
+        assert_eq!(chip.registers[vx], 0xE)
+    }
+    *
+    */
+
+    #[test]
+    fn test_fx15_set_delay_timer_to_vx() {
+        let mut chip = Chip::new();
+        let vx = 0xA;
+        chip.registers[vx] = 30;
+        chip.delay_timer.value = 0;
+
+        let decoded_instruction = chip.decode(0xFA15);
+        chip.execute(decoded_instruction);
+
+        assert_eq!(chip.delay_timer.value, 30);
+    }
+
+    #[test]
+    fn test_fx18_set_sound_timer_to_vx() {
+        let mut chip = Chip::new();
+        let vx = 0xA;
+        chip.registers[vx] = 30;
+        chip.sound_timer.value = 0;
+
+        let decoded_instruction = chip.decode(0xFA18);
+        chip.execute(decoded_instruction);
+
+        assert_eq!(chip.sound_timer.value, 30);
+    }
+
+    #[test]
+    fn test_fx1e_add_vx_to_i() {
+        let mut chip = Chip::new();
+        chip.i = 0x0F;
+        chip.registers[0xA] = 0xF0;
+        chip.registers[0xF] = 9;
+
+        let decoded_instruction = chip.decode(0xFA1E);
+        chip.execute(decoded_instruction);
+
+        assert_eq!(chip.i, 0xFF);
+        assert_eq!(chip.registers[0xF], 0x9); // VF unaffected
+    }
+
+    #[test]
+    fn test_fx1e_add_vx_to_i_overflow() {
+        let mut chip = Chip::new();
+        chip.i = 4096;
+        chip.registers[0xA] = 255;
+        chip.registers[0xF] = 9;
+
+        let decoded_instruction = chip.decode(0xFA1E);
+        chip.execute(decoded_instruction);
+
+        // Not an overflow, and we don't throw any error. This is the rom's responsibility to ensure
+        assert_eq!(chip.i, 4351);
+        assert_eq!(chip.registers[0xF], 0x9); // VF unaffected
+    }
+
+    #[test]
+    fn test_fx29_set_i_to_sprite_for_vx() {
+        let mut chip = Chip::new();
+        chip.registers[0xA] = 0xF;
+
+        let decoded_instruction = chip.decode(0xFA29);
+        chip.execute(decoded_instruction);
+
+        assert_eq!(FONT_ADDR, 0x050);
+        assert_eq!(chip.i, 0x09B); // FONT_ADDR + skipping 15 5 byte characters(0x4B) to get to 0x9B
+        assert_eq!(chip.memory[chip.i], 0xF0);
+        assert_eq!(chip.memory[chip.i + 1], 0x80);
+        assert_eq!(chip.memory[chip.i + 2], 0xF0);
+        assert_eq!(chip.memory[chip.i + 3], 0x80);
+        assert_eq!(chip.memory[chip.i + 4], 0x80);
     }
 
     #[test]
@@ -730,18 +1182,4 @@ mod tests {
         assert_eq!(chip.registers[3], 32); // Not included, since VX is 0x3
         assert_eq!(chip.registers[4], 0); // Not included, since VX is 0x3
     }
-
-    /* Commenting out since you have to type, but it did allow me to test manually
-     * There has to a better way to test this, or even yet a better way to get the input
-    #[test]
-    fn await_then_store_keypress_works() {
-        let mut chip = Chip::new();
-        let vx: u8 = 5;
-
-        chip.await_then_store_keypress(vx);
-
-        assert_eq!(chip.registers[vx as usize], 0xE)
-    }
-    *
-    */
 }
