@@ -98,35 +98,21 @@ impl Chip {
 
     //Draw sprite at coord (x, y) that is 8 pixels wide and the height arg tall
     fn draw(&mut self, x: u8, y:u8, height: u8) {
-        let vx = self.registers[x as usize] as usize;
-        let vy = self.registers[y as usize] as usize;
-        let mut starting_index = vx + vy * DISPLAY_WIDTH as usize;
-        println!("SELF.I: {:#04X}\tX: {}\tY: {}", self.i, vx, vy);
+        let x_index = self.registers[x as usize] as usize;
+        let y_index = self.registers[y as usize] as usize;
 
-        self.registers[0xF] = 0;
+        self.registers[0xF] = 0; // Clear pixel_flip flag
 
+        // Collect sprite to draw on screen
+        let mut sprite: Vec<u8> = vec![];
         for row in 0..height {
             // Each row is a byte in memory, so to get the next row, go to the next memory addr
-            let pixel_pattern = self.memory[self.i + row as usize];
-
-            for offset in 0..8 {
-                let pixel_bit = (pixel_pattern >> 7 - offset) & 1;
-                let pixel_index = starting_index + offset;
-                if pixel_index >= 2048 {
-                    continue;
-                }
-
-                // set VF to 1 if any screen pixels are flipped from set to unset when sprite is drawn
-                if self.display.get_pixel(pixel_index) == true && pixel_bit == 0 {
-                    self.registers[0xF] = 1; 
-                }
-                self.display.set_pixel(pixel_index, pixel_bit == 1);
-            }
-
-            starting_index += DISPLAY_WIDTH;
+            sprite.push(self.memory[self.i + row as usize]);
         }
 
-        self.display.print();
+        // Let display actually draw the sprite
+        let did_flip_pixel_to_off = self.display.draw_sprite(x_index, y_index, height, sprite);
+        self.registers[0xF] = if did_flip_pixel_to_off { 1 } else { 0 };
     }
 
     fn skip_if_key_press(&mut self, x: u8) {

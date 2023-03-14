@@ -44,6 +44,43 @@ impl Display {
         }
         println!("");
     }
+
+    pub fn draw_sprite(&mut self, x_index: usize, y_index: usize, height: u8, sprite: Vec<u8>) -> bool {
+        let mut starting_index = x_index + y_index * DISPLAY_WIDTH as usize;
+        let mut flipped_pixel_to_off = false;
+
+        for row in 0..height {
+            // Each row is a byte in memory, so to get the next row, go to the next memory addr
+            let pixel_pattern = sprite[row as usize];
+
+            for offset in 0..8 {
+                let pixel_index = starting_index + offset;
+                let pixel_bit = (pixel_pattern >> 7 - offset) & 1;
+                let display_bit = self.get_pixel(pixel_index);
+                let new_value = match (pixel_bit, display_bit) {
+                    (0, false) => false,
+                    (1, false) => true,
+                    (0, true) => true,
+                    (1, true) => {
+                        flipped_pixel_to_off = true;
+                        false
+                    },
+                    _ => panic!("This wasn't supposed to happen: {} {}", pixel_bit, display_bit)
+                };
+
+                if pixel_index >= 2048 {
+                    continue;
+                }
+
+                self.set_pixel(pixel_index, new_value);
+            }
+
+            starting_index += DISPLAY_WIDTH;
+            self.print();
+        }
+
+        flipped_pixel_to_off
+    }
 }
 
 #[cfg(test)]
