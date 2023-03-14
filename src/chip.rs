@@ -320,7 +320,7 @@ impl Chip {
                 } else {
                     let positive_diff = self.registers[y as usize] - self.registers[x as usize];
                     self.registers[0xF] = 0;
-                    0xFF - self.registers[x as usize] - positive_diff
+                    0xFF - positive_diff + 1
                 }
             },
             [8, x, _, 6] => self.store_least_sig_vx_bit(x),
@@ -677,6 +677,49 @@ mod tests {
         assert_eq!(chip.registers[vx as usize], 0x0E);
         assert_eq!(chip.registers[vy as usize], 0x0F); // VY is unchanged
         assert_eq!(chip.registers[vf as usize], 0x1); // Carry flag is set
+    }
+
+    #[test]
+    fn test_8xy5_subtract_vy_from_vx() {
+        let vx = 0x7;
+        let vy = 0x8;
+        let vf = 0xF;
+        let mut chip = Chip::new();
+        let decoded_instruction = DecodedInstruction {
+            nibbles: [0x8, vx, vy, 0x5],
+            nn: 0x85,
+            nnn: 0x785
+        };
+        chip.registers[vx as usize] = 0xFF;
+        chip.registers[vy as usize] = 0x0F;
+
+        chip.execute(decoded_instruction);
+
+        assert_eq!(chip.registers[vx as usize], 0xF0);
+        assert_eq!(chip.registers[vy as usize], 0x0F); // VY is unchanged
+        assert_eq!(chip.registers[vf as usize], 0x1); // Carry flag is set since no borrow
+    }
+
+    #[test]
+    fn test_8xy5_subtract_vy_from_vx_underflow() {
+        let vx = 0x7;
+        let vy = 0x8;
+        let vf = 0xF;
+        let mut chip = Chip::new();
+        let decoded_instruction = DecodedInstruction {
+            nibbles: [0x8, vx, vy, 0x5],
+            nn: 0x85,
+            nnn: 0x785
+        };
+        chip.registers[vx as usize] = 0x0F;
+        chip.registers[vy as usize] = 0xFF;
+
+        chip.execute(decoded_instruction);
+
+        // 0x10F - 0xFF = 0x010 ---> 0x0F - 0xFF is the same, but have to carry.
+        assert_eq!(chip.registers[vx as usize], 0x10);
+        assert_eq!(chip.registers[vy as usize], 0xFF); // VY is unchanged
+        assert_eq!(chip.registers[vf as usize], 0x0); // Carry flag no longer set due to the borrow
     }
 
     /* Commenting out since you have to type, but it did allow me to test manually
