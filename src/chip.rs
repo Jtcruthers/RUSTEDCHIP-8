@@ -1,31 +1,13 @@
 use rand::Rng;
 use crate::font;
-use crate::display::{Display, DISPLAY_WIDTH};
+use crate::display::Display;
+use crate::timer::Timer;
 use device_query::{DeviceQuery, DeviceState, Keycode};
 use std::process;
 
 const FONT_ADDR: usize = 0x050;
 const ROM_ADDR: usize = 0x200;
-
-pub struct Timer {
-    value: u8
-}
-
-impl Timer {
-    pub fn new() -> Self {
-        Self {
-            value: 0
-        }
-    }
-
-    pub fn set(&mut self, time: u8) {
-        self.value = time;
-    }
-
-    pub fn get(&self) -> u8 {
-        self.value
-    }
-}
+const TIMER_HZ: u8 = 60;
 
 pub struct DecodedInstruction {
     nibbles: [u8; 4],
@@ -53,8 +35,8 @@ impl Chip {
             stack_level: 0,
             display: Display::new(),
             registers: [0; 16],
-            delay_timer: Timer::new(),
-            sound_timer: Timer::new(),
+            delay_timer: Timer::new(TIMER_HZ),
+            sound_timer: Timer::new(TIMER_HZ),
             i: 0,
             pc: 0
         };
@@ -1003,7 +985,7 @@ mod tests {
         let mut chip = Chip::new();
         let vx = 0xA;
         chip.registers[vx] = 0;
-        chip.delay_timer.value = 30;
+        chip.delay_timer.set(30);
 
         let decoded_instruction = chip.decode(0xFA07);
         chip.execute(decoded_instruction);
@@ -1031,12 +1013,12 @@ mod tests {
         let mut chip = Chip::new();
         let vx = 0xA;
         chip.registers[vx] = 30;
-        chip.delay_timer.value = 0;
+        chip.delay_timer.set(0);
 
         let decoded_instruction = chip.decode(0xFA15);
         chip.execute(decoded_instruction);
 
-        assert_eq!(chip.delay_timer.value, 30);
+        assert_eq!(chip.delay_timer.get(), 30);
     }
 
     #[test]
@@ -1044,12 +1026,12 @@ mod tests {
         let mut chip = Chip::new();
         let vx = 0xA;
         chip.registers[vx] = 30;
-        chip.sound_timer.value = 0;
+        chip.sound_timer.set(0);
 
         let decoded_instruction = chip.decode(0xFA18);
         chip.execute(decoded_instruction);
 
-        assert_eq!(chip.sound_timer.value, 30);
+        assert_eq!(chip.sound_timer.get(), 30);
     }
 
     #[test]
