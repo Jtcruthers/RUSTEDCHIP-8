@@ -208,14 +208,14 @@ impl Chip {
     }
 
     fn store_registers_to_i(&mut self, x: u8) {
-        for register in 0..x as usize {
+        for register in 0..=x as usize {
             let address = self.i + register;
             self.memory[address] = self.registers[register];
         }
     }
 
     fn load_registers_to_i(&mut self, x: u8) {
-        for register in 0..x as usize {
+        for register in 0..=x as usize {
             let address = self.i + register;
             self.registers[register] = self.memory[address]
         }
