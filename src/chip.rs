@@ -307,7 +307,7 @@ impl Chip {
                 let sum = self.registers[x as usize] as u16 + self.registers[y as usize] as u16;
                 if sum > 255 {
                     self.registers[0xF] = 1;
-                    (sum - 255) as u8
+                    (sum - 255 - 1) as u8
                 } else {
                     self.registers[0xF] = 0;
                     sum as u8
@@ -634,6 +634,49 @@ mod tests {
 
         assert_eq!(chip.registers[vx as usize], 0xE0);
         assert_eq!(chip.registers[vf], 0x0); // Carry flag is unchanged
+    }
+
+    #[test]
+    fn test_8xy4_add_vx_and_vy() {
+        let vx = 0x7;
+        let vy = 0x8;
+        let vf = 0xF;
+        let mut chip = Chip::new();
+        let decoded_instruction = DecodedInstruction {
+            nibbles: [0x8, vx, vy, 0x4],
+            nn: 0x84,
+            nnn: 0x784
+        };
+        chip.registers[vx as usize] = 0xF0;
+        chip.registers[vy as usize] = 0x0F;
+
+        chip.execute(decoded_instruction);
+
+        assert_eq!(chip.registers[vx as usize], 0xFF);
+        assert_eq!(chip.registers[vy as usize], 0x0F); // VY is unchanged
+        assert_eq!(chip.registers[vf as usize], 0x0); // Carry flag is not set
+    }
+
+    #[test]
+    fn test_8xy4_add_vx_and_vy_overflow() {
+        let vx = 0x7;
+        let vy = 0x8;
+        let vf = 0xF;
+        let mut chip = Chip::new();
+        let decoded_instruction = DecodedInstruction {
+            nibbles: [0x8, vx, vy, 0x4],
+            nn: 0x84,
+            nnn: 0x784
+        };
+        chip.registers[vx as usize] = 0xFF;
+        chip.registers[vy as usize] = 0x0F;
+
+        chip.execute(decoded_instruction);
+
+        // 0xFF + 0x0F = 0x10E --> u8 only has 8 bits, so it's 0xOE
+        assert_eq!(chip.registers[vx as usize], 0x0E);
+        assert_eq!(chip.registers[vy as usize], 0x0F); // VY is unchanged
+        assert_eq!(chip.registers[vf as usize], 0x1); // Carry flag is set
     }
 
     /* Commenting out since you have to type, but it did allow me to test manually
