@@ -1,4 +1,5 @@
 use rand::Rng;
+use std::{time::{Duration, SystemTime}, thread};
 use crate::font;
 use crate::display::Display;
 use crate::timer::Timer;
@@ -7,6 +8,7 @@ use std::process;
 
 const CHIP8: &str = "CHIP-8";
 const SUPERCHIP: &str = "S-CHIP";
+const MAXIMUM_INSTRUCTIONS_PER_SECOND: u128 = 1200;
 const FONT_ADDR: usize = 0x050;
 const ROM_ADDR: usize = 0x200;
 const TIMER_HZ: u8 = 60;
@@ -377,10 +379,17 @@ impl Chip {
     }
 
     pub fn step(&mut self) {
+        let start_time = SystemTime::now();
         let instruction = self.fetch();
         let decoded_instruction = self.decode(instruction);
         self.execute(decoded_instruction);
         self.check_timers();
+        let time_to_complete = SystemTime::elapsed(&start_time).expect("Cant get step time");
+        if time_to_complete.as_millis() < (1000 / MAXIMUM_INSTRUCTIONS_PER_SECOND) {
+            let time_under = (1000 / MAXIMUM_INSTRUCTIONS_PER_SECOND) - time_to_complete.as_millis();
+            thread::sleep(Duration::from_millis(time_under as u64));
+        }
+        self.step_counter += 1;
     }
 
     pub fn load_rom(&mut self, rom: &Vec<u8>) {
