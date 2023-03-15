@@ -140,7 +140,6 @@ impl Chip {
             0xE => Keycode::F,
             0xF => Keycode::V,
             _ => {
-                println!("UNKNOWN KEY");
                 Keycode::D
             }
         }
@@ -1006,15 +1005,31 @@ mod tests {
     }
 
     #[test]
-    fn test_bnnn_jump_to_nnn_plus_v0() {
+    fn test_bnnn_jump_to_nnn_plus_v0_chip8() {
         let mut chip = Chip::new();
+        chip.chip_type = CHIP8.to_string();
         chip.pc = 0x200;
         chip.registers[0] = 0xF;
 
         let decoded_instruction = chip.decode(0xBABC);
         chip.execute(decoded_instruction);
 
-        assert_eq!(chip.pc, 0xACB);
+        assert_eq!(chip.pc, 0xABC + 0xF);
+    }
+
+    #[test]
+    fn test_bnnn_jump_to_nnn_plus_v0_superchip() {
+        let mut chip = Chip::new();
+        chip.chip_type = SUPERCHIP.to_string();
+        chip.pc = 0x200;
+        chip.registers[0x0] = 0x0;
+        chip.registers[0xA] = 0xF;
+        //SUPERCHIP uses VX instead of V0 to add to NNN
+
+        let decoded_instruction = chip.decode(0xBABC);
+        chip.execute(decoded_instruction);
+
+        assert_eq!(chip.pc, 0xABC + 0xF);
     }
 
     #[test]

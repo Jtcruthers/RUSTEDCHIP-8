@@ -52,10 +52,14 @@ impl Display {
         for row in 0..height {
             // Each row is a byte in memory, so to get the next row, go to the next memory addr
             let pixel_pattern = sprite[row as usize];
+            if row as usize + y_index >= DISPLAY_HEIGHT {
+                break;
+            }
 
+            let max_x_in_row = (starting_index / DISPLAY_WIDTH) * DISPLAY_WIDTH + (DISPLAY_WIDTH - 1);
             for offset in 0..8 {
                 let pixel_index = starting_index + offset;
-                if pixel_index >= 2048 {
+                if pixel_index >= max_x_in_row {
                     break;
                 }
 
