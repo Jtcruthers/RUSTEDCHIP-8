@@ -144,27 +144,26 @@ impl Chip {
         }
     }
 
-    fn keycode_to_hex(&self, keypress: Keycode) -> u8 {
+    fn keycode_to_hex(&self, keypress: &Keycode) -> Option<u8> {
         match keypress {
-            Keycode::Key1 => 0x1,
-            Keycode::Key2 => 0x2,
-            Keycode::Key3 => 0x3,
-            Keycode::Q => 0x4,
-            Keycode::W => 0x5,
-            Keycode::E => 0x6,
-            Keycode::A => 0x7,
-            Keycode::S => 0x8,
-            Keycode::D => 0x9,
-            Keycode::Z => 0xA,
-            Keycode::X => 0x0,
-            Keycode::C => 0xB,
-            Keycode::Key4 => 0xC,
-            Keycode::R => 0xD,
-            Keycode::F => 0xE,
-            Keycode::V => 0xF,
+            Keycode::Key1 => Some(0x1),
+            Keycode::Key2 => Some(0x2),
+            Keycode::Key3 => Some(0x3),
+            Keycode::Q => Some(0x4),
+            Keycode::W => Some(0x5),
+            Keycode::E => Some(0x6),
+            Keycode::A => Some(0x7),
+            Keycode::S => Some(0x8),
+            Keycode::D => Some(0x9),
+            Keycode::Z => Some(0xA),
+            Keycode::X => Some(0x0),
+            Keycode::C => Some(0xB),
+            Keycode::Key4 => Some(0xC),
+            Keycode::R => Some(0xD),
+            Keycode::F => Some(0xE),
+            Keycode::V => Some(0xF),
             _ => {
-                println!("UNKNOWN KEY");
-                0xD
+                None
             }
         }
     }
@@ -172,9 +171,10 @@ impl Chip {
     fn await_then_store_keypress(&mut self, x: u8) {
         let device_state = DeviceState::new();
         loop {
-            let keys: Vec<Keycode> = device_state.get_keys();
-            if keys.len() > 0 {
-                self.registers[x as usize] = self.keycode_to_hex(keys[0]);
+            let keys = device_state.get_keys();
+            let mut keys_in_hex = keys.iter().filter_map(|k| self.keycode_to_hex(k));
+            if let Some(key) = keys_in_hex.next() {
+                self.registers[x as usize] = key;
                 break;
             }
         }
