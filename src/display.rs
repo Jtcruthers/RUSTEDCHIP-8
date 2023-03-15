@@ -26,23 +26,26 @@ impl Display {
     }
 
     pub fn print(&self) {
+        let mut str_to_print = String::new();
         for _ in 0..DISPLAY_WIDTH {
-            print!("-");
+            str_to_print.push_str("-");
         }
-        println!("");
+        str_to_print.push_str("\n");
         for row in 0..DISPLAY_HEIGHT {
-            print!("|");
+            str_to_print.push_str("|");
             for column in 0..DISPLAY_WIDTH {
                 let pixel = DISPLAY_WIDTH * row + column;
-                let sprite = if self.display[pixel] == true { "X" } else { " "};
-                print!("{}", sprite);
+                let sprite = if self.display[pixel] == true { "X" } else { " " };
+                str_to_print.push_str(sprite);
             }
-            println!("|");
+            str_to_print.push_str("|\n");
         }
         for _ in 0..DISPLAY_WIDTH {
-             print!("-");
+            str_to_print.push_str("-");
         }
-        println!("");
+        str_to_print.push_str("\n");
+
+        println!("{}", str_to_print);
     }
 
     pub fn draw_sprite(&mut self, x_index: usize, y_index: usize, height: u8, sprite: Vec<u8>) -> bool {

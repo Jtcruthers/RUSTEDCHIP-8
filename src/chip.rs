@@ -373,23 +373,24 @@ impl Chip {
         }
     }
 
-    fn check_timers(&mut self) {
-        self.delay_timer.check_decrement();
-        self.sound_timer.check_decrement();
-    }
-
     pub fn step(&mut self) {
         let start_time = SystemTime::now();
+
+        // Run loop
         let instruction = self.fetch();
         let decoded_instruction = self.decode(instruction);
         self.execute(decoded_instruction);
-        self.check_timers();
+
+        // Decrement timers if needed
+        self.delay_timer.check_decrement();
+        self.sound_timer.check_decrement();
+
+        // Sleep timer if executing too fast to hit maximum instructions per second
         let time_to_complete = SystemTime::elapsed(&start_time).expect("Cant get step time");
         if time_to_complete.as_millis() < (1000 / MAXIMUM_INSTRUCTIONS_PER_SECOND) {
             let time_under = (1000 / MAXIMUM_INSTRUCTIONS_PER_SECOND) - time_to_complete.as_millis();
             thread::sleep(Duration::from_millis(time_under as u64));
         }
-        self.step_counter += 1;
     }
 
     pub fn load_rom(&mut self, rom: &Vec<u8>) {
