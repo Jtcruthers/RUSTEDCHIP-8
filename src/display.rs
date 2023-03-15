@@ -18,11 +18,13 @@ impl Display {
     }
 
     pub fn set_pixel(&mut self, pixel_index: usize, value: bool) {
-        self.display[pixel_index] = value;
+        let actual_index = pixel_index % DISPLAY_SIZE;
+        self.display[actual_index] = value;
     }
 
     pub fn get_pixel(&self, pixel_index: usize) -> bool {
-        self.display[pixel_index]
+        let actual_index = pixel_index % DISPLAY_SIZE;
+        self.display[actual_index]
     }
 
     pub fn print(&self) {
