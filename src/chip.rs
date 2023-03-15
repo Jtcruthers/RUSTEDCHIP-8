@@ -5,6 +5,8 @@ use crate::timer::Timer;
 use device_query::{DeviceQuery, DeviceState, Keycode};
 use std::process;
 
+const CHIP8: &str = "CHIP-8";
+const SUPERCHIP: &str = "S-CHIP";
 const FONT_ADDR: usize = 0x050;
 const ROM_ADDR: usize = 0x200;
 const TIMER_HZ: u8 = 60;
@@ -40,7 +42,7 @@ impl Chip {
             sound_timer: Timer::new(TIMER_HZ),
             i: 0,
             pc: 0,
-            chip_type: "CHIP-8".to_string()
+            chip_type: SUPERCHIP.to_string()
         };
 
         let font = font::get_font();
@@ -241,21 +243,21 @@ impl Chip {
             [8, x, y, 1] => {
                 self.registers[x as usize] = self.registers[x as usize] | self.registers[y as usize];
 
-                if self.chip_type == "CHIP-8" {
+                if self.chip_type == CHIP8 {
                     self.registers[0xF] = 0;
                 }
             },
             [8, x, y, 2] => {
                 self.registers[x as usize] = self.registers[x as usize] & self.registers[y as usize];
 
-                if self.chip_type == "CHIP-8" {
+                if self.chip_type == CHIP8 {
                     self.registers[0xF] = 0;
                 }
             },
             [8, x, y, 3] => {
                 self.registers[x as usize] = self.registers[x as usize] ^ self.registers[y as usize];
 
-                if self.chip_type == "CHIP-8" {
+                if self.chip_type == CHIP8 {
                     self.registers[0xF] = 0;
                 }
             },
@@ -315,7 +317,10 @@ impl Chip {
                 }
             },
             [0xA, _, _, _] => self.i = decoded_instruction.nnn,
-            [0xB, _, _, _] => self.pc = self.registers[0] as usize + decoded_instruction.nnn,
+            [0xB, x, _, _] => {
+                let register_index = if self.chip_type == SUPERCHIP { x as usize } else { 0 };
+                self.pc = self.registers[register_index] as usize + decoded_instruction.nnn
+            },
             [0xC, x, _, _] => self.set_vx_rand(x, decoded_instruction.nn),
             [0xD, x, y, n] => self.draw(x, y, n),
             [0xE, x, 0x9, 0xE] => self.skip_if_key_press(x),
