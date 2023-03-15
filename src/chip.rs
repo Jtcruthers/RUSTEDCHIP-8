@@ -286,7 +286,10 @@ impl Chip {
                     diff
                 }
             },
-            [8, x, _, 6] => {
+            [8, x, y, 6] => {
+                if self.chip_type == CHIP8 {
+                    self.registers[x as usize] = self.registers[y as usize];
+                }
                 let vx = self.registers[x as usize];
                 let lsb = vx & 1;
 
@@ -304,7 +307,10 @@ impl Chip {
                     0xFF - positive_diff + 1
                 }
             },
-            [8, x, _, 0xE] => {
+            [8, x, y, 0xE] => {
+                if self.chip_type == CHIP8 {
+                    self.registers[x as usize] = self.registers[y as usize];
+                }
                 let vx = self.registers[x as usize];
                 let msb = (vx >> 7) & 1;
 
