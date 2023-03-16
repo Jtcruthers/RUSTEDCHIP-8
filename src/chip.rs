@@ -7,6 +7,7 @@ use crate::timer::Timer;
 use device_query::{DeviceQuery, DeviceState, Keycode};
 use std::process;
 
+#[derive(ValueEnum, Clone, Debug)]
 pub enum ChipType {
     CHIP8,
     SCHIP
