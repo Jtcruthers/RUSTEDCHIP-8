@@ -179,13 +179,21 @@ impl Chip {
 
     fn await_then_store_keypress(&mut self, x: u8) {
         let device_state = DeviceState::new();
+        let mut keys_already_down = device_state.get_keys();
         loop {
-            let keys = device_state.get_keys();
-            let mut keys_in_hex = keys.iter().filter_map(|k| self.keycode_to_hex(k));
-            if let Some(key) = keys_in_hex.next() {
-                self.registers[x as usize] = key;
-                break;
+            let keys_down_now = device_state.get_keys();
+            for key_down_now in &keys_down_now {
+                if keys_already_down.contains(&key_down_now) {
+                    continue;
+                }
+
+                if let Some(pressed_key) = self.keycode_to_hex(&key_down_now) {
+                    self.registers[x as usize] = pressed_key;
+                    return;
+                }
+
             }
+            keys_already_down = keys_down_now;
         }
     }
 
