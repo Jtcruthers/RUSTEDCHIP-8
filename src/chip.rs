@@ -1,13 +1,17 @@
 use rand::Rng;
 use std::{time::{Duration, SystemTime}, thread};
+use clap::ValueEnum;
 use crate::font;
 use crate::display::Display;
 use crate::timer::Timer;
 use device_query::{DeviceQuery, DeviceState, Keycode};
 use std::process;
 
-const CHIP8: &str = "CHIP-8";
-const SUPERCHIP: &str = "S-CHIP";
+pub enum ChipType {
+    CHIP8,
+    SCHIP
+}
+
 const MAXIMUM_INSTRUCTIONS_PER_SECOND: u128 = 1200;
 const FONT_ADDR: usize = 0x050;
 const ROM_ADDR: usize = 0x200;
@@ -29,11 +33,11 @@ pub struct Chip {
     pub sound_timer: Timer,
     pub i: usize,
     pub pc: usize,
-    pub chip_type: String
+    pub chip_type: ChipType
 }
 
 impl Chip {
-    pub fn new() -> Self {
+    pub fn new(target_ips: u128, chip_type: ChipType) -> Self {
         let mut chip = Chip {
             memory: [0; 4096],
             stack: [0; 32],
@@ -44,7 +48,7 @@ impl Chip {
             sound_timer: Timer::new(TIMER_HZ),
             i: 0,
             pc: 0,
-            chip_type: SUPERCHIP.to_string()
+            chip_type
         };
 
         let font = font::get_font();
@@ -244,21 +248,21 @@ impl Chip {
             [8, x, y, 1] => {
                 self.registers[x as usize] = self.registers[x as usize] | self.registers[y as usize];
 
-                if self.chip_type == CHIP8 {
+                if matches!(self.chip_type, ChipType::CHIP8) {
                     self.registers[0xF] = 0;
                 }
             },
             [8, x, y, 2] => {
                 self.registers[x as usize] = self.registers[x as usize] & self.registers[y as usize];
 
-                if self.chip_type == CHIP8 {
+                if matches!(self.chip_type, ChipType::CHIP8) {
                     self.registers[0xF] = 0;
                 }
             },
             [8, x, y, 3] => {
                 self.registers[x as usize] = self.registers[x as usize] ^ self.registers[y as usize];
 
-                if self.chip_type == CHIP8 {
+                if matches!(self.chip_type, ChipType::CHIP8) {
                     self.registers[0xF] = 0;
                 }
             },
@@ -288,7 +292,7 @@ impl Chip {
                 }
             },
             [8, x, y, 6] => {
-                if self.chip_type == CHIP8 {
+                if matches!(self.chip_type, ChipType::CHIP8) {
                     self.registers[x as usize] = self.registers[y as usize];
                 }
                 let vx = self.registers[x as usize];
@@ -309,7 +313,7 @@ impl Chip {
                 }
             },
             [8, x, y, 0xE] => {
-                if self.chip_type == CHIP8 {
+                if matches!(self.chip_type, ChipType::CHIP8) {
                     self.registers[x as usize] = self.registers[y as usize];
                 }
                 let vx = self.registers[x as usize];
@@ -325,7 +329,7 @@ impl Chip {
             },
             [0xA, _, _, _] => self.i = decoded_instruction.nnn,
             [0xB, x, _, _] => {
-                let register_index = if self.chip_type == SUPERCHIP { x as usize } else { 0 };
+                let register_index = if matches!(self.chip_type, ChipType::SCHIP) { x as usize } else { 0 };
                 self.pc = self.registers[register_index] as usize + decoded_instruction.nnn
             },
             [0xC, x, _, _] => self.set_vx_rand(x, decoded_instruction.nn),
@@ -355,7 +359,7 @@ impl Chip {
                 }
 
                 // CHIP-8 updates I to the end of the stored registers
-                if self.chip_type == "CHIP-8" {
+                if matches!(self.chip_type, ChipType::CHIP8) {
                     self.i = self.i + x as usize;
                 }
             },
@@ -365,7 +369,7 @@ impl Chip {
                     self.registers[register] = self.memory[address]
                 }
 
-                if self.chip_type == "CHIP-8" {
+                if matches!(self.chip_type, ChipType::CHIP8) {
                     self.i = self.i + x as usize;
                 }
             },
@@ -410,7 +414,7 @@ mod tests {
 
     #[test]
     fn initial_memory_has_font_at_0x050() {
-        let chip = Chip::new();
+        let chip = Chip::new(1200, ChipType::CHIP8);
         let font = font::get_font();
 
         for (i, byte) in font.iter().enumerate() {
@@ -420,7 +424,7 @@ mod tests {
 
     #[test]
     fn initial_stack_is_32_zeroed_out_double_bytes() {
-        let chip = Chip::new();
+        let chip = Chip::new(1200, ChipType::CHIP8);
         assert_eq!(chip.stack.len(), 32);
         for stack_frame in chip.stack.iter() {
             assert_eq!(*stack_frame, 0x00000000)
@@ -429,7 +433,7 @@ mod tests {
 
     #[test]
     fn timers_can_be_set_to_value() {
-        let mut delay_timer = Chip::new().delay_timer;
+        let mut delay_timer = Chip::new(1200, ChipType::CHIP8).delay_timer;
         assert_eq!(delay_timer.get(), 0);
 
         delay_timer.set(255);
@@ -438,7 +442,7 @@ mod tests {
 
     #[test]
     fn fetch_gets_two_byte_instruction_and_increments_pc() {
-        let mut chip = Chip::new();
+        let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.pc = 30;
 
         chip.memory[30] = 0xAB;
@@ -452,7 +456,7 @@ mod tests {
 
     #[test]
     fn decode_parses_instruction() {
-        let chip = Chip::new();
+        let chip = Chip::new(1200, ChipType::CHIP8);
         let instruction = 0xABCD;
 
         let decoded_instruction = chip.decode(instruction);
@@ -467,7 +471,7 @@ mod tests {
 
     #[test]
     fn calling_and_returning_from_functions_works() {
-        let mut chip = Chip::new();
+        let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.pc = 0xFFF;
 
         chip.call_at(0x200);
@@ -498,7 +502,7 @@ mod tests {
 
     #[test]
     fn load_rom() {
-        let mut chip = Chip::new();
+        let mut chip = Chip::new(1200, ChipType::CHIP8);
         let rom: Vec<u8> = vec![0xD, 0xE, 0xA, 0xD, 0xB, 0xE, 0xE, 0xF];
 
         chip.load_rom(&rom);
@@ -515,7 +519,7 @@ mod tests {
 
     #[test]
     fn test_00e0_clear_display() {
-        let mut chip = Chip::new();
+        let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.display.display = [true; DISPLAY_SIZE];
 
         let decoded_instruction = chip.decode(0x00E0);
@@ -526,7 +530,7 @@ mod tests {
 
     #[test]
     fn test_00ee_return_from_subroutine() {
-        let mut chip = Chip::new();
+        let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.pc = 0x500;
         chip.stack[0] = 0x250;
         chip.stack_level = 1;
@@ -540,7 +544,7 @@ mod tests {
 
     #[test]
     fn test_1nnn_jump() {
-        let mut chip = Chip::new();
+        let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.pc = 0x250;
 
         let decoded_instruction = chip.decode(0x1ABC);
@@ -551,7 +555,7 @@ mod tests {
 
     #[test]
     fn test_2nnn_call_subroutine_at_nnn() {
-        let mut chip = Chip::new();
+        let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.pc = 0x250;
 
         let decoded_instruction = chip.decode(0x2ABC);
@@ -563,7 +567,7 @@ mod tests {
 
     #[test]
     fn test_3xnn_skip_if_vx_equal_nn_dont_skip() {
-        let mut chip = Chip::new();
+        let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.pc = 0x250;
         chip.registers[0xA] = 0xAA;
 
@@ -575,7 +579,7 @@ mod tests {
 
     #[test]
     fn test_3xnn_skip_if_vx_equal_nn_skip() {
-        let mut chip = Chip::new();
+        let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.pc = 0x250;
         chip.registers[0xA] = 0xAA;
 
@@ -587,7 +591,7 @@ mod tests {
 
     #[test]
     fn test_4xnn_skip_if_vx_not_equal_nn_dont_skip() {
-        let mut chip = Chip::new();
+        let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.pc = 0x250;
         chip.registers[0xA] = 0xAA;
 
@@ -599,7 +603,7 @@ mod tests {
 
     #[test]
     fn test_4xnn_skip_if_vx_not_equal_nn_skip() {
-        let mut chip = Chip::new();
+        let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.pc = 0x250;
         chip.registers[0xA] = 0xAA;
 
@@ -611,7 +615,7 @@ mod tests {
 
     #[test]
     fn test_5xy0_skip_if_vx_equal_vy_dont_skip() {
-        let mut chip = Chip::new();
+        let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.pc = 0x250;
         chip.registers[0xA] = 0xAA;
         chip.registers[0xB] = 0xBB;
@@ -624,7 +628,7 @@ mod tests {
 
     #[test]
     fn test_5xy0_skip_if_vx_equal_vy_skip() {
-        let mut chip = Chip::new();
+        let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.pc = 0x250;
         chip.registers[0xA] = 0xAA;
         chip.registers[0xB] = 0xAA;
@@ -637,7 +641,7 @@ mod tests {
 
     #[test]
     fn test_6xnn_set_vx_to_nn_00() {
-        let mut chip = Chip::new();
+        let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.registers[0xA] = 0x0;
 
         let decoded_instruction = chip.decode(0x6A00);
@@ -648,7 +652,7 @@ mod tests {
 
     #[test]
     fn test_6xnn_set_vx_to_nn_ff() {
-        let mut chip = Chip::new();
+        let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.registers[0xA] = 0x0;
 
         let decoded_instruction = chip.decode(0x6AFF);
@@ -661,7 +665,7 @@ mod tests {
     fn test_7xnn_add_vx_and_nn() {
         let vx: usize = 0x3;
         let vf: usize = 0xF;
-        let mut chip = Chip::new();
+        let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.registers[vx] = 0x10; // vx = 0x10
         chip.registers[vf] = 0x01;
 
@@ -677,7 +681,7 @@ mod tests {
     fn test_7xnn_add_vx_and_nn_overflow() {
         let vx: usize = 0x3;
         let vf: usize = 0xF;
-        let mut chip = Chip::new();
+        let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.registers[vx] = 0xF0; // vx = 0xF0
         chip.registers[vf] = 0x00;
 
@@ -693,7 +697,7 @@ mod tests {
     fn test_8xy0_set_vx_to_value_of_vy() {
         let vx: usize = 0xA;
         let vy: usize = 0xB;
-        let mut chip = Chip::new();
+        let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.registers[vx] = 0xF0;
         chip.registers[vy] = 0x0F;
 
@@ -708,7 +712,7 @@ mod tests {
     fn test_8xy1_set_vx_to_vx_bitwise_or_vy_none() {
         let vx: usize = 0xA;
         let vy: usize = 0xB;
-        let mut chip = Chip::new();
+        let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.registers[vx] = 0x00;
         chip.registers[vy] = 0x00;
 
@@ -723,7 +727,7 @@ mod tests {
     fn test_8xy1_set_vx_to_vx_bitwise_or_vy_all() {
         let vx: usize = 0xA;
         let vy: usize = 0xB;
-        let mut chip = Chip::new();
+        let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.registers[vx] = 0xF0;
         chip.registers[vy] = 0x0F;
 
@@ -738,7 +742,7 @@ mod tests {
     fn test_8xy2_set_vx_to_vx_bitwise_and_vy_none() {
         let vx: usize = 0xA;
         let vy: usize = 0xB;
-        let mut chip = Chip::new();
+        let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.registers[vx] = 0xF0;
         chip.registers[vy] = 0x0F;
 
@@ -753,7 +757,7 @@ mod tests {
     fn test_8xy2_set_vx_to_vx_bitwise_and_vy_some() {
         let vx: usize = 0xA;
         let vy: usize = 0xB;
-        let mut chip = Chip::new();
+        let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.registers[vx] = 0xF2;
         chip.registers[vy] = 0x18;
 
@@ -768,7 +772,7 @@ mod tests {
     fn test_8xy2_set_vx_to_vx_bitwise_and_vy_all() {
         let vx: usize = 0xA;
         let vy: usize = 0xB;
-        let mut chip = Chip::new();
+        let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.registers[vx] = 0xFF;
         chip.registers[vy] = 0xFF;
 
@@ -783,7 +787,7 @@ mod tests {
     fn test_8xy3_set_vx_to_vx_bitwise_xor_vy_none() {
         let vx: usize = 0xA;
         let vy: usize = 0xB;
-        let mut chip = Chip::new();
+        let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.registers[vx] = 0xFF;
         chip.registers[vy] = 0xFF;
 
@@ -798,7 +802,7 @@ mod tests {
     fn test_8xy3_set_vx_to_vx_bitwise_xor_vy_some() {
         let vx: usize = 0xA;
         let vy: usize = 0xB;
-        let mut chip = Chip::new();
+        let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.registers[vx] = 0xF2;
         chip.registers[vy] = 0x18;
 
@@ -813,7 +817,7 @@ mod tests {
     fn test_8xy3_set_vx_to_vx_bitwise_xor_vy_all() {
         let vx: usize = 0xA;
         let vy: usize = 0xB;
-        let mut chip = Chip::new();
+        let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.registers[vx] = 0xF0;
         chip.registers[vy] = 0x0F;
 
@@ -829,7 +833,7 @@ mod tests {
         let vx: usize = 0xA;
         let vy: usize = 0xB;
         let vf: usize = 0xF;
-        let mut chip = Chip::new();
+        let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.registers[vx] = 0xF0;
         chip.registers[vy] = 0x0F;
 
@@ -846,7 +850,7 @@ mod tests {
         let vx: usize = 0xA;
         let vy: usize = 0xB;
         let vf: usize = 0xF;
-        let mut chip = Chip::new();
+        let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.registers[vx] = 0xFF;
         chip.registers[vy] = 0x0F;
 
@@ -864,7 +868,7 @@ mod tests {
         let vx = 0xA;
         let vy = 0xB;
         let vf = 0xF;
-        let mut chip = Chip::new();
+        let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.registers[vx as usize] = 0xFF;
         chip.registers[vy as usize] = 0x0F;
 
@@ -881,7 +885,7 @@ mod tests {
         let vx = 0xA;
         let vy = 0xB;
         let vf = 0xF;
-        let mut chip = Chip::new();
+        let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.registers[vx as usize] = 0x0F;
         chip.registers[vy as usize] = 0xFF;
 
@@ -898,7 +902,7 @@ mod tests {
     fn test_8xy6_store_vx_least_sig_bit_into_vf_1() {
         let vx: usize = 0xA;
         let vf: usize = 0xF;
-        let mut chip = Chip::new();
+        let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.registers[vx] = 0b11111101;
         chip.registers[vf] = 0x00;
 
@@ -913,7 +917,7 @@ mod tests {
     fn test_8xy6_store_vx_least_sig_bit_into_vf_0() {
         let vx: usize = 0xA;
         let vf: usize = 0xF;
-        let mut chip = Chip::new();
+        let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.registers[vx] = 0b10000010;
         chip.registers[vf] = 0x00;
 
@@ -929,7 +933,7 @@ mod tests {
         let vx = 0xA;
         let vy = 0xB;
         let vf = 0xF;
-        let mut chip = Chip::new();
+        let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.registers[vx as usize] = 0x0F;
         chip.registers[vy as usize] = 0xFF;
 
@@ -946,7 +950,7 @@ mod tests {
         let vx = 0xA;
         let vy = 0xB;
         let vf = 0xF;
-        let mut chip = Chip::new();
+        let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.registers[vx as usize] = 0xFF;
         chip.registers[vy as usize] = 0x0F;
 
@@ -962,7 +966,7 @@ mod tests {
     fn test_8xye_store_vx_most_sig_bit_into_vf_1() {
         let vx: usize = 0xA;
         let vf: usize = 0xF;
-        let mut chip = Chip::new();
+        let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.registers[vx] = 0b10000001;
         chip.registers[vf] = 0x00;
 
@@ -979,7 +983,7 @@ mod tests {
     fn test_8xye_store_vx_most_sig_bit_into_vf_0() {
         let vx: usize = 0xA;
         let vf: usize = 0xF;
-        let mut chip = Chip::new();
+        let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.registers[vx] = 0b01111111;
         chip.registers[vf] = 0x00;
 
@@ -992,7 +996,7 @@ mod tests {
 
     #[test]
     fn test_9xy0_skip_if_vx_not_equal_vy_skip() {
-        let mut chip = Chip::new();
+        let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.pc = 0x250;
         chip.registers[0xA] = 0xAA;
         chip.registers[0xB] = 0x00;
@@ -1005,7 +1009,7 @@ mod tests {
 
     #[test]
     fn test_annn_set_i_to_nnn() {
-        let mut chip = Chip::new();
+        let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.i = 0;
 
         let decoded_instruction = chip.decode(0xABED);
@@ -1016,8 +1020,8 @@ mod tests {
 
     #[test]
     fn test_bnnn_jump_to_nnn_plus_v0_chip8() {
-        let mut chip = Chip::new();
-        chip.chip_type = CHIP8.to_string();
+        let mut chip = Chip::new(1200, ChipType::CHIP8);
+        chip.chip_type = ChipType::CHIP8;
         chip.pc = 0x200;
         chip.registers[0] = 0xF;
 
@@ -1029,8 +1033,8 @@ mod tests {
 
     #[test]
     fn test_bnnn_jump_to_nnn_plus_v0_superchip() {
-        let mut chip = Chip::new();
-        chip.chip_type = SUPERCHIP.to_string();
+        let mut chip = Chip::new(1200, ChipType::CHIP8);
+        chip.chip_type = ChipType::SCHIP;
         chip.pc = 0x200;
         chip.registers[0x0] = 0x0;
         chip.registers[0xA] = 0xF;
@@ -1044,7 +1048,7 @@ mod tests {
 
     #[test]
     fn test_ex9e_skip_if_vx_key_is_pressed() {
-        let mut chip = Chip::new();
+        let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.pc = 0x200;
 
         let decoded_instruction = chip.decode(0xEA9E);
@@ -1055,7 +1059,7 @@ mod tests {
 
     #[test]
     fn test_fx07_set_vx_to_delay_timers_value() {
-        let mut chip = Chip::new();
+        let mut chip = Chip::new(1200, ChipType::CHIP8);
         let vx = 0xA;
         chip.registers[vx] = 0;
         chip.delay_timer.set(30);
@@ -1070,7 +1074,7 @@ mod tests {
      * There has to a better way to test this, or even yet a better way to get the input
     #[test]
     fn test_fx0a_await_then_store_keypress_in_vx() {
-        let mut chip = Chip::new();
+        let mut chip = Chip::new(1200, ChipType::CHIP8);
         let vx = 0xA;
 
         let decoded_instruction = chip.decode(0xFA0A);
@@ -1083,7 +1087,7 @@ mod tests {
 
     #[test]
     fn test_fx15_set_delay_timer_to_vx() {
-        let mut chip = Chip::new();
+        let mut chip = Chip::new(1200, ChipType::CHIP8);
         let vx = 0xA;
         chip.registers[vx] = 30;
         chip.delay_timer.set(0);
@@ -1096,7 +1100,7 @@ mod tests {
 
     #[test]
     fn test_fx18_set_sound_timer_to_vx() {
-        let mut chip = Chip::new();
+        let mut chip = Chip::new(1200, ChipType::CHIP8);
         let vx = 0xA;
         chip.registers[vx] = 30;
         chip.sound_timer.set(0);
@@ -1109,7 +1113,7 @@ mod tests {
 
     #[test]
     fn test_fx1e_add_vx_to_i() {
-        let mut chip = Chip::new();
+        let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.i = 0x0F;
         chip.registers[0xA] = 0xF0;
         chip.registers[0xF] = 9;
@@ -1123,7 +1127,7 @@ mod tests {
 
     #[test]
     fn test_fx1e_add_vx_to_i_overflow() {
-        let mut chip = Chip::new();
+        let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.i = 4096;
         chip.registers[0xA] = 255;
         chip.registers[0xF] = 9;
@@ -1138,7 +1142,7 @@ mod tests {
 
     #[test]
     fn test_fx29_set_i_to_sprite_for_vx() {
-        let mut chip = Chip::new();
+        let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.registers[0xA] = 0xF;
 
         let decoded_instruction = chip.decode(0xFA29);
@@ -1156,7 +1160,7 @@ mod tests {
     #[test]
     fn test_fx33_store_binary_at_i_000() {
         let vx = 0xA;
-        let mut chip = Chip::new();
+        let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.registers[vx] = 0;
         chip.i = 0;
 
@@ -1171,7 +1175,7 @@ mod tests {
     #[test]
     fn test_fx33_store_binary_at_i_255() {
         let vx = 0xA;
-        let mut chip = Chip::new();
+        let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.registers[vx] = 255;
         chip.i = 0;
 
@@ -1186,7 +1190,7 @@ mod tests {
     #[test]
     fn test_fx33_store_binary_at_i_123() {
         let vx = 0xA;
-        let mut chip = Chip::new();
+        let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.registers[vx] = 123;
         chip.i = 0;
 
@@ -1200,7 +1204,7 @@ mod tests {
 
     #[test]
     fn test_fx55_store_registers_at_i() {
-        let mut chip = Chip::new();
+        let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.i = 0x500;
         chip.registers[0x0] = 123;
         chip.registers[0x5] = 23;
@@ -1218,7 +1222,7 @@ mod tests {
 
     #[test]
     fn test_fx65_load_registers_from_i() {
-        let mut chip = Chip::new();
+        let mut chip = Chip::new(1200, ChipType::CHIP8);
         let i = 0x500;
         chip.i = i;
         chip.memory[i + 0] = 123;
