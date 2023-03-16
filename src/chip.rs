@@ -13,7 +13,6 @@ pub enum ChipType {
     SCHIP
 }
 
-const MAXIMUM_INSTRUCTIONS_PER_SECOND: u128 = 1200;
 const FONT_ADDR: usize = 0x050;
 const ROM_ADDR: usize = 0x200;
 const TIMER_HZ: u8 = 60;
@@ -34,6 +33,7 @@ pub struct Chip {
     pub sound_timer: Timer,
     pub i: usize,
     pub pc: usize,
+    pub target_ips: u128,
     pub chip_type: ChipType
 }
 
@@ -49,6 +49,7 @@ impl Chip {
             sound_timer: Timer::new(TIMER_HZ),
             i: 0,
             pc: 0,
+            target_ips,
             chip_type
         };
 
@@ -392,8 +393,8 @@ impl Chip {
 
         // Sleep timer if executing too fast to hit maximum instructions per second
         let time_to_complete = SystemTime::elapsed(&start_time).expect("Cant get step time");
-        if time_to_complete.as_millis() < (1000 / MAXIMUM_INSTRUCTIONS_PER_SECOND) {
-            let time_under = (1000 / MAXIMUM_INSTRUCTIONS_PER_SECOND) - time_to_complete.as_millis();
+        if time_to_complete.as_millis() < (1000 / self.target_ips) {
+            let time_under = (1000 / self.target_ips) - time_to_complete.as_millis();
             thread::sleep(Duration::from_millis(time_under as u64));
         }
     }
