@@ -900,25 +900,65 @@ mod tests {
     }
 
     #[test]
-    fn test_8xy6_store_vx_least_sig_bit_into_vf_1() {
+    fn test_8xy6_store_vy_least_sig_bit_into_vx_1_chip8() {
         let vx: usize = 0xA;
+        let vy: usize = 0xB;
         let vf: usize = 0xF;
         let mut chip = Chip::new(1200, ChipType::CHIP8);
-        chip.registers[vx] = 0b11111101;
+        chip.registers[vx] = 0b00000000;
+        chip.registers[vy] = 0b11111101;
         chip.registers[vf] = 0x00;
 
         let decoded_instruction = chip.decode(0x8AB6);
         chip.execute(decoded_instruction);
 
         assert_eq!(chip.registers[vx], 0b01111110);
+        assert_eq!(chip.registers[vy], 0b11111101);
         assert_eq!(chip.registers[vf], 1);
     }
 
     #[test]
-    fn test_8xy6_store_vx_least_sig_bit_into_vf_0() {
+    fn test_8xy6_store_vy_least_sig_bit_into_vf_0_chip8() {
         let vx: usize = 0xA;
+        let vy: usize = 0xB;
         let vf: usize = 0xF;
         let mut chip = Chip::new(1200, ChipType::CHIP8);
+        chip.registers[vx] = 0b11111111;
+        chip.registers[vy] = 0b10000010;
+        chip.registers[vf] = 0x00;
+
+        let decoded_instruction = chip.decode(0x8AB6);
+        chip.execute(decoded_instruction);
+
+        assert_eq!(chip.registers[vx], 0b01000001);
+        assert_eq!(chip.registers[vy], 0b10000010);
+        assert_eq!(chip.registers[vf], 0);
+    }
+
+    #[test]
+    fn test_8xy6_store_vx_least_sig_bit_into_vf_1_schip() {
+        // VY is completely ignored here
+        let vx: usize = 0xA;
+        let vy: usize = 0xB;
+        let vf: usize = 0xF;
+        let mut chip = Chip::new(1200, ChipType::SCHIP);
+        chip.registers[vx] = 0b11111101;
+        chip.registers[vy] = 0b00000000;
+        chip.registers[vf] = 0x00;
+
+        let decoded_instruction = chip.decode(0x8AB6);
+        chip.execute(decoded_instruction);
+
+        assert_eq!(chip.registers[vx], 0b01111110);
+        assert_eq!(chip.registers[vy], 0b00000000);
+        assert_eq!(chip.registers[vf], 1);
+    }
+
+    #[test]
+    fn test_8xy6_store_vx_least_sig_bit_into_vf_0_schip() {
+        let vx: usize = 0xA;
+        let vf: usize = 0xF;
+        let mut chip = Chip::new(1200, ChipType::SCHIP);
         chip.registers[vx] = 0b10000010;
         chip.registers[vf] = 0x00;
 
@@ -964,10 +1004,48 @@ mod tests {
     }
 
     #[test]
-    fn test_8xye_store_vx_most_sig_bit_into_vf_1() {
+    fn test_8xye_store_vx_most_sig_bit_into_vf_1_chip8() {
         let vx: usize = 0xA;
+        let vy: usize = 0xB;
         let vf: usize = 0xF;
         let mut chip = Chip::new(1200, ChipType::CHIP8);
+        chip.registers[vx] = 0b11111111;
+        chip.registers[vy] = 0b10000001;
+        chip.registers[vf] = 0x00;
+
+        let decoded_instruction = chip.decode(0x8ABE);
+        chip.execute(decoded_instruction);
+
+        assert_eq!(chip.registers[vx], 0b00000010);
+        assert_eq!(chip.registers[vy], 0b10000001);
+        assert_eq!(chip.registers[vf], 0x1); // Carry flag is unchanged
+                                             //TODO - This is the super8 impl. Need to also do
+                                             //chip-8 impl only
+    }
+
+    #[test]
+    fn test_8xye_store_vx_most_sig_bit_into_vf_0_chip8() {
+        let vx: usize = 0xA;
+        let vy: usize = 0xB;
+        let vf: usize = 0xF;
+        let mut chip = Chip::new(1200, ChipType::CHIP8);
+        chip.registers[vx] = 0b00000000;
+        chip.registers[vy] = 0b01111111;
+        chip.registers[vf] = 0x00;
+
+        let decoded_instruction = chip.decode(0x8ABE);
+        chip.execute(decoded_instruction);
+
+        assert_eq!(chip.registers[vx], 0b11111110);
+        assert_eq!(chip.registers[vy], 0b01111111);
+        assert_eq!(chip.registers[vf], 0x0);
+    }
+    
+    #[test]
+    fn test_8xye_store_vx_most_sig_bit_into_vf_1_schip() {
+        let vx: usize = 0xA;
+        let vf: usize = 0xF;
+        let mut chip = Chip::new(1200, ChipType::SCHIP);
         chip.registers[vx] = 0b10000001;
         chip.registers[vf] = 0x00;
 
@@ -981,10 +1059,10 @@ mod tests {
     }
 
     #[test]
-    fn test_8xye_store_vx_most_sig_bit_into_vf_0() {
+    fn test_8xye_store_vx_most_sig_bit_into_vf_0_schip() {
         let vx: usize = 0xA;
         let vf: usize = 0xF;
-        let mut chip = Chip::new(1200, ChipType::CHIP8);
+        let mut chip = Chip::new(1200, ChipType::SCHIP);
         chip.registers[vx] = 0b01111111;
         chip.registers[vf] = 0x00;
 
