@@ -9,7 +9,7 @@ mod timer;
 use chip::{Chip, ChipType};
 
 #[derive(Parser, Debug)]
-#[command(author = "Justin Carruthers", about = "Configurable CHIP-8 emulator")]
+#[command(author = "Justin Carruthers", about = "Configurable CHIP-8 (and variants) emulator")]
 struct Args {
     rom_name: String,
 
