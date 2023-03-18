@@ -28,6 +28,9 @@ impl Display {
     }
 
     pub fn print(&self) {
+        // Clear screen
+        print!("\x1B[2J\x1B[1;1H");
+
         let mut str_to_print = String::new();
         for _ in 0..DISPLAY_WIDTH {
             str_to_print.push_str("-");
