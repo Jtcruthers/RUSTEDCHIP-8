@@ -400,11 +400,9 @@ impl Chip {
         self.sound_timer.check_decrement();
 
         // Sleep timer if executing too fast to hit maximum instructions per second
-        let time_to_complete = SystemTime::elapsed(&start_time).expect("Cant get step time");
-        if time_to_complete.as_millis() < (1000 / self.target_ips) {
-            let time_under = (1000 / self.target_ips) - time_to_complete.as_millis();
-            thread::sleep(Duration::from_millis(time_under as u64));
-        }
+        let duration_time = Duration::from_micros(1000000 / self.target_ips as u64);
+        let minimum_time = start_time.checked_add(duration_time).expect("Cant get step time");
+        while minimum_time.max(SystemTime::now()) == minimum_time{ }
     }
 
     pub fn load_rom(&mut self, rom: &Vec<u8>) {
