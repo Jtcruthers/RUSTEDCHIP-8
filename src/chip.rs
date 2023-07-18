@@ -370,7 +370,7 @@ impl Chip {
 
                 // CHIP-8 updates I to the end of the stored registers
                 if matches!(self.chip_type, ChipType::CHIP8) {
-                    self.i = self.i + x as usize;
+                    self.i = self.i + x as usize + 1;
                 }
             },
             [0xF, x, 0x6, 0x5] => {
@@ -380,7 +380,7 @@ impl Chip {
                 }
 
                 if matches!(self.chip_type, ChipType::CHIP8) {
-                    self.i = self.i + x as usize;
+                    self.i = self.i + x as usize + 1;
                 }
             },
             _ => ()
@@ -1307,6 +1307,18 @@ mod tests {
     }
 
     #[test]
+    fn test_fx55_increments_i_chip8() {
+        let mut chip = Chip::new(1200, ChipType::CHIP8);
+        chip.i = 0x500;
+        chip.registers[0x0] = 1;
+
+        let decoded_instruction = chip.decode(0xFA55);
+        chip.execute(decoded_instruction);
+
+        assert_eq!(chip.i, 0x500 + 10 + 1); // i + 1 + Vx, where Vx is 0xA
+    }
+
+    #[test]
     fn test_fx65_load_registers_from_i() {
         let mut chip = Chip::new(1200, ChipType::CHIP8);
         let i = 0x500;
@@ -1325,5 +1337,17 @@ mod tests {
         assert_eq!(chip.registers[2], 3);
         assert_eq!(chip.registers[3], 32); // Not included, since VX is 0x3
         assert_eq!(chip.registers[4], 0); // Not included, since VX is 0x3
+    }
+
+    #[test]
+    fn test_fx65_increments_i_chip8() {
+        let mut chip = Chip::new(1200, ChipType::CHIP8);
+        chip.i = 0x500;
+        chip.registers[0x0] = 1;
+
+        let decoded_instruction = chip.decode(0xFF65);
+        chip.execute(decoded_instruction);
+
+        assert_eq!(chip.i, 0x500 + 15 + 1); // i + 1 + Vx, where Vx is 0xF
     }
 }
