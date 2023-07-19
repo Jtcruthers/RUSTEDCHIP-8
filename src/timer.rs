@@ -20,9 +20,13 @@ impl Timer {
                                                 .elapsed()
                                                 .expect("Couldn't get elapsed time")
                                                 .as_millis();
-        if elapsed_ms_since_last_decrement > self.ms_per_cycle {
+        let amount_to_decrement = elapsed_ms_since_last_decrement / self.ms_per_cycle;
+        if amount_to_decrement > self.value as u128 {
+            self.value = 0;
             self.last_decremented = SystemTime::now();
-            self.value = if self.value > 0 { self.value - 1} else { 0 };
+        } else if amount_to_decrement > 0 {
+            self.value = self.value - amount_to_decrement as u8;
+            self.last_decremented = SystemTime::now();
         }
     }
 
