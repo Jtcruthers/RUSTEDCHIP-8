@@ -182,12 +182,10 @@ impl Chip {
         let mut keys_already_down = device_state.get_keys();
         loop {
             let keys_down_now = device_state.get_keys();
-            for key_down_now in &keys_down_now {
-                if keys_already_down.contains(&key_down_now) {
+            for key_already_down in &keys_already_down {
+                if keys_down_now.contains(&key_already_down) {
                     continue;
-                }
-
-                if let Some(pressed_key) = self.keycode_to_hex(&key_down_now) {
+                } else if let Some(pressed_key) = self.keycode_to_hex(&key_already_down) {
                     self.registers[x as usize] = pressed_key;
                     return;
                 }
