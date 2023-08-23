@@ -7,6 +7,7 @@ mod display;
 mod timer;
 
 use chip::{Chip, ChipType};
+use display::window_conf;
 
 #[derive(Parser, Debug)]
 #[command(author = "Justin Carruthers", about = "Configurable CHIP-8 (and variants) emulator")]
@@ -24,7 +25,7 @@ fn read_rom(rom_name: &String) -> Vec<u8> {
     fs::read(rom_name).expect("Cant read the rom")
 }
 
-#[macroquad::main("RUSTYCHIP-8")]
+#[macroquad::main(window_conf)]
 async fn main() {
     let args = Args::parse();
 

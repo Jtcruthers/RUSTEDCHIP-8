@@ -6,6 +6,15 @@ pub const DISPLAY_HEIGHT: usize = 32;
 pub const DISPLAY_SIZE: usize = DISPLAY_WIDTH * DISPLAY_HEIGHT;
 pub const PIXEL_DIMENSION: f32 = 20.;
 
+pub fn window_conf() -> Conf {
+    Conf {
+        window_title: "RUSTYCHIP-8".to_owned(),
+        window_width: 1280,
+        window_height: 640,
+        ..Default::default()
+    }
+}
+
 pub struct Display {
     pub display: [bool; DISPLAY_SIZE],
 }
