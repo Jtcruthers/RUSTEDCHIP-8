@@ -21,15 +21,11 @@ struct Args {
     chip_type: ChipType,
 }
 
-fn read_rom(rom_name: &String) -> Vec<u8> {
-    fs::read(rom_name).expect("Cant read the rom")
-}
-
 #[macroquad::main(window_conf)]
 async fn main() {
     let args = Args::parse();
 
-    let rom = read_rom(&args.rom_name);
+    let rom = fs::read(&args.rom_name).expect("Cant read the rom");
     let mut chip = Chip::new(args.target_instructions_per_second, args.chip_type);
 
     chip.load_rom(&rom);
