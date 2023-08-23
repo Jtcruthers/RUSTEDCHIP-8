@@ -1,3 +1,5 @@
+use macroquad::prelude::*;
+
 pub const DISPLAY_WIDTH: usize = 64;
 pub const DISPLAY_HEIGHT: usize = 32;
 pub const DISPLAY_SIZE: usize = DISPLAY_WIDTH * DISPLAY_HEIGHT;
@@ -13,8 +15,11 @@ impl Display {
         }
     }
 
-    pub fn clear(&mut self) {
+    pub async fn clear(&mut self) {
         self.display = [false; DISPLAY_SIZE];
+        clear_background(LIGHTGRAY);
+        draw_rectangle(10., 10., 100., 100., RED);
+        next_frame().await;
     }
 
     pub fn set_pixel(&mut self, pixel_index: usize, value: bool) {
@@ -27,7 +32,7 @@ impl Display {
         self.display[actual_index]
     }
 
-    pub fn print(&self) {
+    pub async fn print(&self) {
         // Clear screen
         print!("\x1B[2J\x1B[1;1H");
 
@@ -53,7 +58,7 @@ impl Display {
         println!("{}", str_to_print);
     }
 
-    pub fn draw_sprite(&mut self, x_index: usize, y_index: usize, height: u8, sprite: Vec<u8>) -> bool {
+    pub async fn draw_sprite(&mut self, x_index: usize, y_index: usize, height: u8, sprite: Vec<u8>) -> bool {
         let mut starting_index = x_index + y_index * DISPLAY_WIDTH as usize;
         let mut flipped_pixel_to_off = false;
 
@@ -90,7 +95,7 @@ impl Display {
             starting_index += DISPLAY_WIDTH;
         }
 
-        self.print();
+        self.print().await;
         flipped_pixel_to_off
     }
 }

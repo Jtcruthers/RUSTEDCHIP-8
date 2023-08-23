@@ -24,7 +24,8 @@ fn read_rom(rom_name: &String) -> Vec<u8> {
     fs::read(rom_name).expect("Cant read the rom")
 }
 
-fn main() {
+#[macroquad::main("RUSTYCHIP-8")]
+async fn main() {
     let args = Args::parse();
 
     let rom = read_rom(&args.rom_name);
@@ -32,6 +33,7 @@ fn main() {
 
     chip.load_rom(&rom);
     loop {
-        chip.step();
+        chip.step().await;
     }
+
 }

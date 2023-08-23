@@ -10,4 +10,6 @@ clap = { version = "4.1.8", features = ["derive"] }
 derive = "1.0.0"
 device_query = "1.1.2"
 features = "0.10.0"
+macroquad = "0.4.2"
 rand = "0.8.5"
+futures = "0.3"

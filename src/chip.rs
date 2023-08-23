@@ -61,8 +61,8 @@ impl Chip {
         chip
     }
 
-    fn clear_display(&mut self) {
-        self.display.clear();
+    async fn clear_display(&mut self) {
+        self.display.clear().await;
     }
 
     fn handle_return(&mut self) {
@@ -91,7 +91,7 @@ impl Chip {
     }
 
     //Draw sprite at coord (x, y) that is 8 pixels wide and the height arg tall
-    fn draw(&mut self, x: u8, y:u8, height: u8) {
+    async fn draw(&mut self, x: u8, y:u8, height: u8) {
         let x_index = self.registers[x as usize] as usize;
         let y_index = self.registers[y as usize] as usize;
 
@@ -105,7 +105,7 @@ impl Chip {
         }
 
         // Let display actually draw the sprite
-        let did_flip_pixel_to_off = self.display.draw_sprite(x_index, y_index, height, sprite);
+        let did_flip_pixel_to_off = self.display.draw_sprite(x_index, y_index, height, sprite).await;
         self.registers[0xF] = if did_flip_pixel_to_off { 1 } else { 0 };
     }
 
@@ -220,10 +220,10 @@ impl Chip {
         DecodedInstruction { nibbles, nn, nnn }
     }
 
-    fn execute(&mut self, decoded_instruction: DecodedInstruction) {
+    async fn execute(&mut self, decoded_instruction: DecodedInstruction) {
         match decoded_instruction.nibbles {
             [0, 0, 0x0, 0x0] => process::exit(1),
-            [0, 0, 0xE, 0x0] => self.clear_display(),
+            [0, 0, 0xE, 0x0] => self.clear_display().await,
             [0, 0, 0xE, 0xE] => self.handle_return(),
             [0, _, _, _] => { },
             [1, _, _, _] => self.jump(decoded_instruction.nnn),
@@ -341,7 +341,7 @@ impl Chip {
                 self.pc = self.registers[register_index] as usize + decoded_instruction.nnn
             },
             [0xC, x, _, _] => self.set_vx_rand(x, decoded_instruction.nn),
-            [0xD, x, y, n] => self.draw(x, y, n),
+            [0xD, x, y, n] => self.draw(x, y, n).await,
             [0xE, x, 0x9, 0xE] => self.skip_if_key_press(x),
             [0xE, x, 0xA, 0x1] => self.skip_if_not_key_press(x),
             [0xF, x, 0x0, 0x7] => self.registers[x as usize] = self.delay_timer.get(),
@@ -385,13 +385,13 @@ impl Chip {
         }
     }
 
-    pub fn step(&mut self) {
+    pub async fn step(&mut self) {
         let start_time = SystemTime::now();
 
         // Run loop
         let instruction = self.fetch();
         let decoded_instruction = self.decode(instruction);
-        self.execute(decoded_instruction);
+        self.execute(decoded_instruction).await;
 
         // Decrement timers if needed
         self.delay_timer.check_decrement();
