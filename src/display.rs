@@ -1,8 +1,10 @@
 use macroquad::prelude::*;
+use macroquad::color::hsl_to_rgb;
 
 pub const DISPLAY_WIDTH: usize = 64;
 pub const DISPLAY_HEIGHT: usize = 32;
 pub const DISPLAY_SIZE: usize = DISPLAY_WIDTH * DISPLAY_HEIGHT;
+pub const PIXEL_DIMENSION: f32 = 20.;
 
 pub struct Display {
     pub display: [bool; DISPLAY_SIZE],
@@ -17,8 +19,8 @@ impl Display {
 
     pub async fn clear(&mut self) {
         self.display = [false; DISPLAY_SIZE];
-        clear_background(LIGHTGRAY);
-        draw_rectangle(10., 10., 100., 100., RED);
+        clear_background(BLACK);
+
         next_frame().await;
     }
 
@@ -33,29 +35,26 @@ impl Display {
     }
 
     pub async fn print(&self) {
-        // Clear screen
-        print!("\x1B[2J\x1B[1;1H");
+        clear_background(BLACK);
 
         let mut str_to_print = String::new();
-        for _ in 0..DISPLAY_WIDTH {
-            str_to_print.push_str("-");
-        }
-        str_to_print.push_str("\n");
+
         for row in 0..DISPLAY_HEIGHT {
             str_to_print.push_str("|");
             for column in 0..DISPLAY_WIDTH {
                 let pixel = DISPLAY_WIDTH * row + column;
-                let sprite = if self.display[pixel] == true { "X" } else { " " };
-                str_to_print.push_str(sprite);
-            }
-            str_to_print.push_str("|\n");
-        }
-        for _ in 0..DISPLAY_WIDTH {
-            str_to_print.push_str("-");
-        }
-        str_to_print.push_str("\n");
+                let pixel_height = PIXEL_DIMENSION * row as f32;
+                let pixel_width = PIXEL_DIMENSION * column as f32;
 
-        println!("{}", str_to_print);
+                let pixel_on_color = Color::new(255., 176., 0., 255.);
+                let pixel_off_color = BLACK;
+                let pixel_color = if self.display[pixel] == true { pixel_on_color } else { pixel_off_color };
+
+                draw_rectangle(pixel_width, pixel_height, PIXEL_DIMENSION, PIXEL_DIMENSION, pixel_color);
+            }
+        }
+
+        next_frame().await;
     }
 
     pub async fn draw_sprite(&mut self, x_index: usize, y_index: usize, height: u8, sprite: Vec<u8>) -> bool {
