@@ -1,5 +1,5 @@
 use rand::Rng;
-use std::{time::{Duration, SystemTime}, thread};
+use std::time::{Duration, SystemTime};
 use clap::ValueEnum;
 use crate::font;
 use crate::display::Display;
@@ -61,8 +61,8 @@ impl Chip {
         chip
     }
 
-    async fn clear_display(&mut self) {
-        self.display.clear().await;
+    fn clear_display(&mut self) {
+        self.display.clear();
     }
 
     fn handle_return(&mut self) {
@@ -223,7 +223,7 @@ impl Chip {
     async fn execute(&mut self, decoded_instruction: DecodedInstruction) {
         match decoded_instruction.nibbles {
             [0, 0, 0x0, 0x0] => process::exit(1),
-            [0, 0, 0xE, 0x0] => self.clear_display().await,
+            [0, 0, 0xE, 0x0] => self.clear_display(),
             [0, 0, 0xE, 0xE] => self.handle_return(),
             [0, _, _, _] => { },
             [1, _, _, _] => self.jump(decoded_instruction.nnn),
@@ -523,152 +523,152 @@ mod tests {
         assert_eq!(chip.memory[ROM_ADDR + 7], 0xF);
     }
 
-    #[test]
-    fn test_00e0_clear_display() {
+    #[tokio::test]
+    async fn test_00e0_clear_display() {
         let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.display.display = [true; DISPLAY_SIZE];
 
         let decoded_instruction = chip.decode(0x00E0);
-        chip.execute(decoded_instruction);
+        chip.execute(decoded_instruction).await;
 
         assert_eq!(chip.display.display, [false; DISPLAY_SIZE]);
     }
 
-    #[test]
-    fn test_00ee_return_from_subroutine() {
+    #[tokio::test]
+    async fn test_00ee_return_from_subroutine() {
         let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.pc = 0x500;
         chip.stack[0] = 0x250;
         chip.stack_level = 1;
 
         let decoded_instruction = chip.decode(0x00EE);
-        chip.execute(decoded_instruction);
+        chip.execute(decoded_instruction).await;
 
         assert_eq!(chip.pc, 0x250);
         assert_eq!(chip.stack_level, 0);
     }
 
-    #[test]
-    fn test_1nnn_jump() {
+    #[tokio::test]
+    async fn test_1nnn_jump() {
         let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.pc = 0x250;
 
         let decoded_instruction = chip.decode(0x1ABC);
-        chip.execute(decoded_instruction);
+        chip.execute(decoded_instruction).await;
 
         assert_eq!(chip.pc, 0xABC);
     }
 
-    #[test]
-    fn test_2nnn_call_subroutine_at_nnn() {
+    #[tokio::test]
+    async fn test_2nnn_call_subroutine_at_nnn() {
         let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.pc = 0x250;
 
         let decoded_instruction = chip.decode(0x2ABC);
-        chip.execute(decoded_instruction);
+        chip.execute(decoded_instruction).await;
 
         assert_eq!(chip.pc, 0xABC);
         assert_eq!(chip.stack[0], 0x250);
     }
 
-    #[test]
-    fn test_3xnn_skip_if_vx_equal_nn_dont_skip() {
+    #[tokio::test]
+    async fn test_3xnn_skip_if_vx_equal_nn_dont_skip() {
         let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.pc = 0x250;
         chip.registers[0xA] = 0xAA;
 
         let decoded_instruction = chip.decode(0x3A00);
-        chip.execute(decoded_instruction);
+        chip.execute(decoded_instruction).await;
 
         assert_eq!(chip.pc, 0x250);
     }
 
-    #[test]
-    fn test_3xnn_skip_if_vx_equal_nn_skip() {
+    #[tokio::test]
+    async fn test_3xnn_skip_if_vx_equal_nn_skip() {
         let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.pc = 0x250;
         chip.registers[0xA] = 0xAA;
 
         let decoded_instruction = chip.decode(0x3AAA);
-        chip.execute(decoded_instruction);
+        chip.execute(decoded_instruction).await;
 
         assert_eq!(chip.pc, 0x252);
     }
 
-    #[test]
-    fn test_4xnn_skip_if_vx_not_equal_nn_dont_skip() {
+    #[tokio::test]
+    async fn test_4xnn_skip_if_vx_not_equal_nn_dont_skip() {
         let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.pc = 0x250;
         chip.registers[0xA] = 0xAA;
 
         let decoded_instruction = chip.decode(0x4AAA);
-        chip.execute(decoded_instruction);
+        chip.execute(decoded_instruction).await;
 
         assert_eq!(chip.pc, 0x250);
     }
 
-    #[test]
-    fn test_4xnn_skip_if_vx_not_equal_nn_skip() {
+    #[tokio::test]
+    async fn test_4xnn_skip_if_vx_not_equal_nn_skip() {
         let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.pc = 0x250;
         chip.registers[0xA] = 0xAA;
 
         let decoded_instruction = chip.decode(0x4A00);
-        chip.execute(decoded_instruction);
+        chip.execute(decoded_instruction).await;
 
         assert_eq!(chip.pc, 0x252);
     }
 
-    #[test]
-    fn test_5xy0_skip_if_vx_equal_vy_dont_skip() {
+    #[tokio::test]
+    async fn test_5xy0_skip_if_vx_equal_vy_dont_skip() {
         let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.pc = 0x250;
         chip.registers[0xA] = 0xAA;
         chip.registers[0xB] = 0xBB;
 
         let decoded_instruction = chip.decode(0x5AB0);
-        chip.execute(decoded_instruction);
+        chip.execute(decoded_instruction).await;
 
         assert_eq!(chip.pc, 0x250);
     }
 
-    #[test]
-    fn test_5xy0_skip_if_vx_equal_vy_skip() {
+    #[tokio::test]
+    async fn test_5xy0_skip_if_vx_equal_vy_skip() {
         let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.pc = 0x250;
         chip.registers[0xA] = 0xAA;
         chip.registers[0xB] = 0xAA;
 
         let decoded_instruction = chip.decode(0x5AB0);
-        chip.execute(decoded_instruction);
+        chip.execute(decoded_instruction).await;
 
         assert_eq!(chip.pc, 0x252);
     }
 
-    #[test]
-    fn test_6xnn_set_vx_to_nn_00() {
+    #[tokio::test]
+    async fn test_6xnn_set_vx_to_nn_00() {
         let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.registers[0xA] = 0x0;
 
         let decoded_instruction = chip.decode(0x6A00);
-        chip.execute(decoded_instruction);
+        chip.execute(decoded_instruction).await;
 
         assert_eq!(chip.registers[0xA], 0x00);
     }
 
-    #[test]
-    fn test_6xnn_set_vx_to_nn_ff() {
+    #[tokio::test]
+    async fn test_6xnn_set_vx_to_nn_ff() {
         let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.registers[0xA] = 0x0;
 
         let decoded_instruction = chip.decode(0x6AFF);
-        chip.execute(decoded_instruction);
+        chip.execute(decoded_instruction).await;
 
         assert_eq!(chip.registers[0xA], 0xFF);
     }
 
-    #[test]
-    fn test_7xnn_add_vx_and_nn() {
+    #[tokio::test]
+    async fn test_7xnn_add_vx_and_nn() {
         let vx: usize = 0x3;
         let vf: usize = 0xF;
         let mut chip = Chip::new(1200, ChipType::CHIP8);
@@ -676,15 +676,15 @@ mod tests {
         chip.registers[vf] = 0x01;
 
         let decoded_instruction = chip.decode(0x730F); // n = 0x0F
-        chip.execute(decoded_instruction);
+        chip.execute(decoded_instruction).await;
 
         // 0x10 + 0x0F = 0x1F
         assert_eq!(chip.registers[vx], 0x1F);
         assert_eq!(chip.registers[vf], 0x1); // Carry flag is unchanged
     }
 
-    #[test]
-    fn test_7xnn_add_vx_and_nn_overflow() {
+    #[tokio::test]
+    async fn test_7xnn_add_vx_and_nn_overflow() {
         let vx: usize = 0x3;
         let vf: usize = 0xF;
         let mut chip = Chip::new(1200, ChipType::CHIP8);
@@ -692,15 +692,15 @@ mod tests {
         chip.registers[vf] = 0x00;
 
         let decoded_instruction = chip.decode(0x73F0); // nn = 0xF0
-        chip.execute(decoded_instruction);
+        chip.execute(decoded_instruction).await;
 
         // 0xF0 + 0xF0 = 0x1E0 --> only 8 bits, so its just 0xE0
         assert_eq!(chip.registers[vx], 0xE0);
         assert_eq!(chip.registers[vf], 0x0); // Carry flag is unchanged
     }
 
-    #[test]
-    fn test_8xy0_set_vx_to_value_of_vy() {
+    #[tokio::test]
+    async fn test_8xy0_set_vx_to_value_of_vy() {
         let vx: usize = 0xA;
         let vy: usize = 0xB;
         let mut chip = Chip::new(1200, ChipType::CHIP8);
@@ -708,14 +708,14 @@ mod tests {
         chip.registers[vy] = 0x0F;
 
         let decoded_instruction = chip.decode(0x8AB0);
-        chip.execute(decoded_instruction);
+        chip.execute(decoded_instruction).await;
 
         assert_eq!(chip.registers[vx], 0x0F);
         assert_eq!(chip.registers[vy], 0x0F); // VY is unchanged
     }
 
-    #[test]
-    fn test_8xy1_set_vx_to_vx_bitwise_or_vy_none() {
+    #[tokio::test]
+    async fn test_8xy1_set_vx_to_vx_bitwise_or_vy_none() {
         let vx: usize = 0xA;
         let vy: usize = 0xB;
         let mut chip = Chip::new(1200, ChipType::CHIP8);
@@ -723,14 +723,14 @@ mod tests {
         chip.registers[vy] = 0x00;
 
         let decoded_instruction = chip.decode(0x8AB1);
-        chip.execute(decoded_instruction);
+        chip.execute(decoded_instruction).await;
 
         assert_eq!(chip.registers[vx], 0x00);
         assert_eq!(chip.registers[vy], 0x00); // VY is unchanged
     }
 
-    #[test]
-    fn test_8xy1_set_vx_to_vx_bitwise_or_vy_all() {
+    #[tokio::test]
+    async fn test_8xy1_set_vx_to_vx_bitwise_or_vy_all() {
         let vx: usize = 0xA;
         let vy: usize = 0xB;
         let mut chip = Chip::new(1200, ChipType::CHIP8);
@@ -738,14 +738,14 @@ mod tests {
         chip.registers[vy] = 0x0F;
 
         let decoded_instruction = chip.decode(0x8AB1);
-        chip.execute(decoded_instruction);
+        chip.execute(decoded_instruction).await;
 
         assert_eq!(chip.registers[vx], 0xFF);
         assert_eq!(chip.registers[vy], 0x0F); // VY is unchanged
     }
 
-    #[test]
-    fn test_8xy2_set_vx_to_vx_bitwise_and_vy_none() {
+    #[tokio::test]
+    async fn test_8xy2_set_vx_to_vx_bitwise_and_vy_none() {
         let vx: usize = 0xA;
         let vy: usize = 0xB;
         let mut chip = Chip::new(1200, ChipType::CHIP8);
@@ -753,14 +753,14 @@ mod tests {
         chip.registers[vy] = 0x0F;
 
         let decoded_instruction = chip.decode(0x8AB2);
-        chip.execute(decoded_instruction);
+        chip.execute(decoded_instruction).await;
 
         assert_eq!(chip.registers[vx], 0x00);
         assert_eq!(chip.registers[vy], 0x0F); // VY is unchanged
     }
 
-    #[test]
-    fn test_8xy2_set_vx_to_vx_bitwise_and_vy_some() {
+    #[tokio::test]
+    async fn test_8xy2_set_vx_to_vx_bitwise_and_vy_some() {
         let vx: usize = 0xA;
         let vy: usize = 0xB;
         let mut chip = Chip::new(1200, ChipType::CHIP8);
@@ -768,14 +768,14 @@ mod tests {
         chip.registers[vy] = 0x18;
 
         let decoded_instruction = chip.decode(0x8AB2);
-        chip.execute(decoded_instruction);
+        chip.execute(decoded_instruction).await;
 
         assert_eq!(chip.registers[vx], 0x10);
         assert_eq!(chip.registers[vy], 0x18); // VY is unchanged
     }
 
-    #[test]
-    fn test_8xy2_set_vx_to_vx_bitwise_and_vy_all() {
+    #[tokio::test]
+    async fn test_8xy2_set_vx_to_vx_bitwise_and_vy_all() {
         let vx: usize = 0xA;
         let vy: usize = 0xB;
         let mut chip = Chip::new(1200, ChipType::CHIP8);
@@ -783,14 +783,14 @@ mod tests {
         chip.registers[vy] = 0xFF;
 
         let decoded_instruction = chip.decode(0x8AB2);
-        chip.execute(decoded_instruction);
+        chip.execute(decoded_instruction).await;
 
         assert_eq!(chip.registers[vx], 0xFF);
         assert_eq!(chip.registers[vy], 0xFF); // VY is unchanged
     }
 
-    #[test]
-    fn test_8xy3_set_vx_to_vx_bitwise_xor_vy_none() {
+    #[tokio::test]
+    async fn test_8xy3_set_vx_to_vx_bitwise_xor_vy_none() {
         let vx: usize = 0xA;
         let vy: usize = 0xB;
         let mut chip = Chip::new(1200, ChipType::CHIP8);
@@ -798,14 +798,14 @@ mod tests {
         chip.registers[vy] = 0xFF;
 
         let decoded_instruction = chip.decode(0x8AB3);
-        chip.execute(decoded_instruction);
+        chip.execute(decoded_instruction).await;
 
         assert_eq!(chip.registers[vx], 0x00);
         assert_eq!(chip.registers[vy], 0xFF); // VY is unchanged
     }
 
-    #[test]
-    fn test_8xy3_set_vx_to_vx_bitwise_xor_vy_some() {
+    #[tokio::test]
+    async fn test_8xy3_set_vx_to_vx_bitwise_xor_vy_some() {
         let vx: usize = 0xA;
         let vy: usize = 0xB;
         let mut chip = Chip::new(1200, ChipType::CHIP8);
@@ -813,14 +813,14 @@ mod tests {
         chip.registers[vy] = 0x18;
 
         let decoded_instruction = chip.decode(0x8AB3);
-        chip.execute(decoded_instruction);
+        chip.execute(decoded_instruction).await;
 
         assert_eq!(chip.registers[vx], 0xEA);
         assert_eq!(chip.registers[vy], 0x18); // VY is unchanged
     }
 
-    #[test]
-    fn test_8xy3_set_vx_to_vx_bitwise_xor_vy_all() {
+    #[tokio::test]
+    async fn test_8xy3_set_vx_to_vx_bitwise_xor_vy_all() {
         let vx: usize = 0xA;
         let vy: usize = 0xB;
         let mut chip = Chip::new(1200, ChipType::CHIP8);
@@ -828,14 +828,14 @@ mod tests {
         chip.registers[vy] = 0x0F;
 
         let decoded_instruction = chip.decode(0x8AB3);
-        chip.execute(decoded_instruction);
+        chip.execute(decoded_instruction).await;
 
         assert_eq!(chip.registers[vx], 0xFF);
         assert_eq!(chip.registers[vy], 0x0F); // VY is unchanged
     }
 
-    #[test]
-    fn test_8xy4_add_vx_and_vy() {
+    #[tokio::test]
+    async fn test_8xy4_add_vx_and_vy() {
         let vx: usize = 0xA;
         let vy: usize = 0xB;
         let vf: usize = 0xF;
@@ -844,15 +844,15 @@ mod tests {
         chip.registers[vy] = 0x0F;
 
         let decoded_instruction = chip.decode(0x8AB4);
-        chip.execute(decoded_instruction);
+        chip.execute(decoded_instruction).await;
 
         assert_eq!(chip.registers[vx], 0xFF);
         assert_eq!(chip.registers[vy], 0x0F); // VY is unchanged
         assert_eq!(chip.registers[vf], 0x0); // Carry flag is not set
     }
 
-    #[test]
-    fn test_8xy4_add_vx_and_vy_overflow() {
+    #[tokio::test]
+    async fn test_8xy4_add_vx_and_vy_overflow() {
         let vx: usize = 0xA;
         let vy: usize = 0xB;
         let vf: usize = 0xF;
@@ -861,7 +861,7 @@ mod tests {
         chip.registers[vy] = 0x0F;
 
         let decoded_instruction = chip.decode(0x8AB4);
-        chip.execute(decoded_instruction);
+        chip.execute(decoded_instruction).await;
 
         // 0xFF + 0x0F = 0x10E --> u8 only has 8 bits, so it's 0xOE
         assert_eq!(chip.registers[vx], 0x0E);
@@ -869,8 +869,8 @@ mod tests {
         assert_eq!(chip.registers[vf], 0x1); // Carry flag is set
     }
 
-    #[test]
-    fn test_8xy5_subtract_vy_from_vx() {
+    #[tokio::test]
+    async fn test_8xy5_subtract_vy_from_vx() {
         let vx = 0xA;
         let vy = 0xB;
         let vf = 0xF;
@@ -879,15 +879,15 @@ mod tests {
         chip.registers[vy as usize] = 0x0F;
 
         let decoded_instruction = chip.decode(0x8AB5);
-        chip.execute(decoded_instruction);
+        chip.execute(decoded_instruction).await;
 
         assert_eq!(chip.registers[vx as usize], 0xF0);
         assert_eq!(chip.registers[vy as usize], 0x0F); // VY is unchanged
         assert_eq!(chip.registers[vf as usize], 0x1); // Carry flag is set since no borrow
     }
 
-    #[test]
-    fn test_8xy5_subtract_vy_from_vx_underflow() {
+    #[tokio::test]
+    async fn test_8xy5_subtract_vy_from_vx_underflow() {
         let vx = 0xA;
         let vy = 0xB;
         let vf = 0xF;
@@ -896,7 +896,7 @@ mod tests {
         chip.registers[vy as usize] = 0xFF;
 
         let decoded_instruction = chip.decode(0x8AB5);
-        chip.execute(decoded_instruction);
+        chip.execute(decoded_instruction).await;
 
         // 0x10F - 0xFF = 0x010 ---> 0x0F - 0xFF is the same, but have to carry.
         assert_eq!(chip.registers[vx as usize], 0x10);
@@ -904,8 +904,8 @@ mod tests {
         assert_eq!(chip.registers[vf as usize], 0x0); // Carry flag no longer set due to the borrow
     }
 
-    #[test]
-    fn test_8xy6_store_vy_least_sig_bit_into_vx_1_chip8() {
+    #[tokio::test]
+    async fn test_8xy6_store_vy_least_sig_bit_into_vx_1_chip8() {
         let vx: usize = 0xA;
         let vy: usize = 0xB;
         let vf: usize = 0xF;
@@ -915,15 +915,15 @@ mod tests {
         chip.registers[vf] = 0x00;
 
         let decoded_instruction = chip.decode(0x8AB6);
-        chip.execute(decoded_instruction);
+        chip.execute(decoded_instruction).await;
 
         assert_eq!(chip.registers[vx], 0b01111110);
         assert_eq!(chip.registers[vy], 0b11111101);
         assert_eq!(chip.registers[vf], 1);
     }
 
-    #[test]
-    fn test_8xy6_store_vy_least_sig_bit_into_vf_0_chip8() {
+    #[tokio::test]
+    async fn test_8xy6_store_vy_least_sig_bit_into_vf_0_chip8() {
         let vx: usize = 0xA;
         let vy: usize = 0xB;
         let vf: usize = 0xF;
@@ -933,15 +933,15 @@ mod tests {
         chip.registers[vf] = 0x00;
 
         let decoded_instruction = chip.decode(0x8AB6);
-        chip.execute(decoded_instruction);
+        chip.execute(decoded_instruction).await;
 
         assert_eq!(chip.registers[vx], 0b01000001);
         assert_eq!(chip.registers[vy], 0b10000010);
         assert_eq!(chip.registers[vf], 0);
     }
 
-    #[test]
-    fn test_8xy6_store_vx_least_sig_bit_into_vf_1_schip() {
+    #[tokio::test]
+    async fn test_8xy6_store_vx_least_sig_bit_into_vf_1_schip() {
         // VY is completely ignored here
         let vx: usize = 0xA;
         let vy: usize = 0xB;
@@ -952,15 +952,15 @@ mod tests {
         chip.registers[vf] = 0x00;
 
         let decoded_instruction = chip.decode(0x8AB6);
-        chip.execute(decoded_instruction);
+        chip.execute(decoded_instruction).await;
 
         assert_eq!(chip.registers[vx], 0b01111110);
         assert_eq!(chip.registers[vy], 0b00000000);
         assert_eq!(chip.registers[vf], 1);
     }
 
-    #[test]
-    fn test_8xy6_store_vx_least_sig_bit_into_vf_0_schip() {
+    #[tokio::test]
+    async fn test_8xy6_store_vx_least_sig_bit_into_vf_0_schip() {
         let vx: usize = 0xA;
         let vf: usize = 0xF;
         let mut chip = Chip::new(1200, ChipType::SCHIP);
@@ -968,14 +968,14 @@ mod tests {
         chip.registers[vf] = 0x00;
 
         let decoded_instruction = chip.decode(0x8AB6);
-        chip.execute(decoded_instruction);
+        chip.execute(decoded_instruction).await;
 
         assert_eq!(chip.registers[vx], 0b01000001);
         assert_eq!(chip.registers[vf], 0);
     }
 
-    #[test]
-    fn test_8xy7_set_vx_to_vy_minux_vx() {
+    #[tokio::test]
+    async fn test_8xy7_set_vx_to_vy_minux_vx() {
         let vx = 0xA;
         let vy = 0xB;
         let vf = 0xF;
@@ -984,15 +984,15 @@ mod tests {
         chip.registers[vy as usize] = 0xFF;
 
         let decoded_instruction = chip.decode(0x8AB7);
-        chip.execute(decoded_instruction);
+        chip.execute(decoded_instruction).await;
 
         assert_eq!(chip.registers[vx as usize], 0xF0);
         assert_eq!(chip.registers[vy as usize], 0xFF); // VY is unchanged
         assert_eq!(chip.registers[vf as usize], 0x1); // Carry flag set due to no borrow
     }
 
-    #[test]
-    fn test_8xy7_set_vx_to_vy_minux_vx_underflow() {
+    #[tokio::test]
+    async fn test_8xy7_set_vx_to_vy_minux_vx_underflow() {
         let vx = 0xA;
         let vy = 0xB;
         let vf = 0xF;
@@ -1001,15 +1001,15 @@ mod tests {
         chip.registers[vy as usize] = 0x0F;
 
         let decoded_instruction = chip.decode(0x8AB7);
-        chip.execute(decoded_instruction);
+        chip.execute(decoded_instruction).await;
 
         assert_eq!(chip.registers[vx as usize], 0x10);
         assert_eq!(chip.registers[vy as usize], 0x0F); // VY is unchanged
         assert_eq!(chip.registers[vf as usize], 0x0); // Carry flag not set due to the borrow
     }
 
-    #[test]
-    fn test_8xye_store_vx_most_sig_bit_into_vf_1_chip8() {
+    #[tokio::test]
+    async fn test_8xye_store_vx_most_sig_bit_into_vf_1_chip8() {
         let vx: usize = 0xA;
         let vy: usize = 0xB;
         let vf: usize = 0xF;
@@ -1019,7 +1019,7 @@ mod tests {
         chip.registers[vf] = 0x00;
 
         let decoded_instruction = chip.decode(0x8ABE);
-        chip.execute(decoded_instruction);
+        chip.execute(decoded_instruction).await;
 
         assert_eq!(chip.registers[vx], 0b00000010);
         assert_eq!(chip.registers[vy], 0b10000001);
@@ -1028,8 +1028,8 @@ mod tests {
                                              //chip-8 impl only
     }
 
-    #[test]
-    fn test_8xye_store_vx_most_sig_bit_into_vf_0_chip8() {
+    #[tokio::test]
+    async fn test_8xye_store_vx_most_sig_bit_into_vf_0_chip8() {
         let vx: usize = 0xA;
         let vy: usize = 0xB;
         let vf: usize = 0xF;
@@ -1039,15 +1039,15 @@ mod tests {
         chip.registers[vf] = 0x00;
 
         let decoded_instruction = chip.decode(0x8ABE);
-        chip.execute(decoded_instruction);
+        chip.execute(decoded_instruction).await;
 
         assert_eq!(chip.registers[vx], 0b11111110);
         assert_eq!(chip.registers[vy], 0b01111111);
         assert_eq!(chip.registers[vf], 0x0);
     }
     
-    #[test]
-    fn test_8xye_store_vx_most_sig_bit_into_vf_1_schip() {
+    #[tokio::test]
+    async fn test_8xye_store_vx_most_sig_bit_into_vf_1_schip() {
         let vx: usize = 0xA;
         let vf: usize = 0xF;
         let mut chip = Chip::new(1200, ChipType::SCHIP);
@@ -1055,7 +1055,7 @@ mod tests {
         chip.registers[vf] = 0x00;
 
         let decoded_instruction = chip.decode(0x8ABE);
-        chip.execute(decoded_instruction);
+        chip.execute(decoded_instruction).await;
 
         assert_eq!(chip.registers[vx], 0b00000010);
         assert_eq!(chip.registers[vf], 0x1); // Carry flag is unchanged
@@ -1063,8 +1063,8 @@ mod tests {
                                              //chip-8 impl only
     }
 
-    #[test]
-    fn test_8xye_store_vx_most_sig_bit_into_vf_0_schip() {
+    #[tokio::test]
+    async fn test_8xye_store_vx_most_sig_bit_into_vf_0_schip() {
         let vx: usize = 0xA;
         let vf: usize = 0xF;
         let mut chip = Chip::new(1200, ChipType::SCHIP);
@@ -1072,51 +1072,51 @@ mod tests {
         chip.registers[vf] = 0x00;
 
         let decoded_instruction = chip.decode(0x8ABE);
-        chip.execute(decoded_instruction);
+        chip.execute(decoded_instruction).await;
 
         assert_eq!(chip.registers[vx], 0b11111110);
         assert_eq!(chip.registers[vf], 0x0);
     }
 
-    #[test]
-    fn test_9xy0_skip_if_vx_not_equal_vy_skip() {
+    #[tokio::test]
+    async fn test_9xy0_skip_if_vx_not_equal_vy_skip() {
         let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.pc = 0x250;
         chip.registers[0xA] = 0xAA;
         chip.registers[0xB] = 0x00;
 
         let decoded_instruction = chip.decode(0x9AB0);
-        chip.execute(decoded_instruction);
+        chip.execute(decoded_instruction).await;
 
         assert_eq!(chip.pc, 0x252);
     }
 
-    #[test]
-    fn test_annn_set_i_to_nnn() {
+    #[tokio::test]
+    async fn test_annn_set_i_to_nnn() {
         let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.i = 0;
 
         let decoded_instruction = chip.decode(0xABED);
-        chip.execute(decoded_instruction);
+        chip.execute(decoded_instruction).await;
 
         assert_eq!(chip.i, 0xBED);
     }
 
-    #[test]
-    fn test_bnnn_jump_to_nnn_plus_v0_chip8() {
+    #[tokio::test]
+    async fn test_bnnn_jump_to_nnn_plus_v0_chip8() {
         let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.chip_type = ChipType::CHIP8;
         chip.pc = 0x200;
         chip.registers[0] = 0xF;
 
         let decoded_instruction = chip.decode(0xBABC);
-        chip.execute(decoded_instruction);
+        chip.execute(decoded_instruction).await;
 
         assert_eq!(chip.pc, 0xABC + 0xF);
     }
 
-    #[test]
-    fn test_bnnn_jump_to_nnn_plus_v0_superchip() {
+    #[tokio::test]
+    async fn test_bnnn_jump_to_nnn_plus_v0_superchip() {
         let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.chip_type = ChipType::SCHIP;
         chip.pc = 0x200;
@@ -1125,31 +1125,31 @@ mod tests {
         //SUPERCHIP uses VX instead of V0 to add to NNN
 
         let decoded_instruction = chip.decode(0xBABC);
-        chip.execute(decoded_instruction);
+        chip.execute(decoded_instruction).await;
 
         assert_eq!(chip.pc, 0xABC + 0xF);
     }
 
-    #[test]
-    fn test_ex9e_skip_if_vx_key_is_pressed() {
+    #[tokio::test]
+    async fn test_ex9e_skip_if_vx_key_is_pressed() {
         let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.pc = 0x200;
 
         let decoded_instruction = chip.decode(0xEA9E);
-        chip.execute(decoded_instruction);
+        chip.execute(decoded_instruction).await;
 
         assert_eq!(chip.pc, 0x200);
     }
 
-    #[test]
-    fn test_fx07_set_vx_to_delay_timers_value() {
+    #[tokio::test]
+    async fn test_fx07_set_vx_to_delay_timers_value() {
         let mut chip = Chip::new(1200, ChipType::CHIP8);
         let vx = 0xA;
         chip.registers[vx] = 0;
         chip.delay_timer.set(30);
 
         let decoded_instruction = chip.decode(0xFA07);
-        chip.execute(decoded_instruction);
+        chip.execute(decoded_instruction).await;
 
         assert_eq!(chip.registers[vx], 30);
     }
@@ -1157,80 +1157,80 @@ mod tests {
     /* Commenting out since you have to type, but it did allow me to test manually
      * There has to a better way to test this, or even yet a better way to get the input
     #[test]
-    fn test_fx0a_await_then_store_keypress_in_vx() {
+    async fn test_fx0a_await_then_store_keypress_in_vx() {
         let mut chip = Chip::new(1200, ChipType::CHIP8);
         let vx = 0xA;
 
         let decoded_instruction = chip.decode(0xFA0A);
-        chip.execute(decoded_instruction); // Have to press E and enter
+        chip.execute(decoded_instruction).await; // Have to press E and enter
 
         assert_eq!(chip.registers[vx], 0xE)
     }
     *
     */
 
-    #[test]
-    fn test_fx15_set_delay_timer_to_vx() {
+    #[tokio::test]
+    async fn test_fx15_set_delay_timer_to_vx() {
         let mut chip = Chip::new(1200, ChipType::CHIP8);
         let vx = 0xA;
         chip.registers[vx] = 30;
         chip.delay_timer.set(0);
 
         let decoded_instruction = chip.decode(0xFA15);
-        chip.execute(decoded_instruction);
+        chip.execute(decoded_instruction).await;
 
         assert_eq!(chip.delay_timer.get(), 30);
     }
 
-    #[test]
-    fn test_fx18_set_sound_timer_to_vx() {
+    #[tokio::test]
+    async fn test_fx18_set_sound_timer_to_vx() {
         let mut chip = Chip::new(1200, ChipType::CHIP8);
         let vx = 0xA;
         chip.registers[vx] = 30;
         chip.sound_timer.set(0);
 
         let decoded_instruction = chip.decode(0xFA18);
-        chip.execute(decoded_instruction);
+        chip.execute(decoded_instruction).await;
 
         assert_eq!(chip.sound_timer.get(), 30);
     }
 
-    #[test]
-    fn test_fx1e_add_vx_to_i() {
+    #[tokio::test]
+    async fn test_fx1e_add_vx_to_i() {
         let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.i = 0x0F;
         chip.registers[0xA] = 0xF0;
         chip.registers[0xF] = 9;
 
         let decoded_instruction = chip.decode(0xFA1E);
-        chip.execute(decoded_instruction);
+        chip.execute(decoded_instruction).await;
 
         assert_eq!(chip.i, 0xFF);
         assert_eq!(chip.registers[0xF], 0x9); // VF unaffected
     }
 
-    #[test]
-    fn test_fx1e_add_vx_to_i_overflow() {
+    #[tokio::test]
+    async fn test_fx1e_add_vx_to_i_overflow() {
         let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.i = 4096;
         chip.registers[0xA] = 255;
         chip.registers[0xF] = 9;
 
         let decoded_instruction = chip.decode(0xFA1E);
-        chip.execute(decoded_instruction);
+        chip.execute(decoded_instruction).await;
 
         // Not an overflow, and we don't throw any error. This is the rom's responsibility to ensure
         assert_eq!(chip.i, 4351);
         assert_eq!(chip.registers[0xF], 0x9); // VF unaffected
     }
 
-    #[test]
-    fn test_fx29_set_i_to_sprite_for_vx() {
+    #[tokio::test]
+    async fn test_fx29_set_i_to_sprite_for_vx() {
         let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.registers[0xA] = 0xF;
 
         let decoded_instruction = chip.decode(0xFA29);
-        chip.execute(decoded_instruction);
+        chip.execute(decoded_instruction).await;
 
         assert_eq!(FONT_ADDR, 0x050);
         assert_eq!(chip.i, 0x09B); // FONT_ADDR + skipping 15 5 byte characters(0x4B) to get to 0x9B
@@ -1241,53 +1241,53 @@ mod tests {
         assert_eq!(chip.memory[chip.i + 4], 0x80);
     }
 
-    #[test]
-    fn test_fx33_store_binary_at_i_000() {
+    #[tokio::test]
+    async fn test_fx33_store_binary_at_i_000() {
         let vx = 0xA;
         let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.registers[vx] = 0;
         chip.i = 0;
 
         let decoded_instruction = chip.decode(0xFA33);
-        chip.execute(decoded_instruction);
+        chip.execute(decoded_instruction).await;
 
         assert_eq!(chip.memory[0], 0x0);
         assert_eq!(chip.memory[1], 0x0);
         assert_eq!(chip.memory[2], 0x0);
     }
 
-    #[test]
-    fn test_fx33_store_binary_at_i_255() {
+    #[tokio::test]
+    async fn test_fx33_store_binary_at_i_255() {
         let vx = 0xA;
         let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.registers[vx] = 255;
         chip.i = 0;
 
         let decoded_instruction = chip.decode(0xFA33);
-        chip.execute(decoded_instruction);
+        chip.execute(decoded_instruction).await;
 
         assert_eq!(chip.memory[0], 0x2);
         assert_eq!(chip.memory[1], 0x5);
         assert_eq!(chip.memory[2], 0x5);
     }
 
-    #[test]
-    fn test_fx33_store_binary_at_i_123() {
+    #[tokio::test]
+    async fn test_fx33_store_binary_at_i_123() {
         let vx = 0xA;
         let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.registers[vx] = 123;
         chip.i = 0;
 
         let decoded_instruction = chip.decode(0xFA33);
-        chip.execute(decoded_instruction);
+        chip.execute(decoded_instruction).await;
 
         assert_eq!(chip.memory[0], 0x1);
         assert_eq!(chip.memory[1], 0x2);
         assert_eq!(chip.memory[2], 0x3);
     }
 
-    #[test]
-    fn test_fx55_store_registers_at_i() {
+    #[tokio::test]
+    async fn test_fx55_store_registers_at_i() {
         let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.i = 0x500;
         chip.registers[0x0] = 123;
@@ -1296,7 +1296,7 @@ mod tests {
         chip.registers[0xB] = 32;
 
         let decoded_instruction = chip.decode(0xFA55);
-        chip.execute(decoded_instruction);
+        chip.execute(decoded_instruction).await;
 
         assert_eq!(chip.memory[0x500], 123);
         assert_eq!(chip.memory[0x505], 23);
@@ -1304,20 +1304,20 @@ mod tests {
         assert_eq!(chip.memory[0x50B], 0); // Not included, since VX is 0xA
     }
 
-    #[test]
-    fn test_fx55_increments_i_chip8() {
+    #[tokio::test]
+    async fn test_fx55_increments_i_chip8() {
         let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.i = 0x500;
         chip.registers[0x0] = 1;
 
         let decoded_instruction = chip.decode(0xFA55);
-        chip.execute(decoded_instruction);
+        chip.execute(decoded_instruction).await;
 
         assert_eq!(chip.i, 0x500 + 10 + 1); // i + 1 + Vx, where Vx is 0xA
     }
 
-    #[test]
-    fn test_fx65_load_registers_from_i() {
+    #[tokio::test]
+    async fn test_fx65_load_registers_from_i() {
         let mut chip = Chip::new(1200, ChipType::CHIP8);
         let i = 0x500;
         chip.i = i;
@@ -1328,7 +1328,7 @@ mod tests {
         chip.memory[i + 4] = 33;
 
         let decoded_instruction = chip.decode(0xF365);
-        chip.execute(decoded_instruction);
+        chip.execute(decoded_instruction).await;
 
         assert_eq!(chip.registers[0], 123);
         assert_eq!(chip.registers[1], 23);
@@ -1337,14 +1337,14 @@ mod tests {
         assert_eq!(chip.registers[4], 0); // Not included, since VX is 0x3
     }
 
-    #[test]
-    fn test_fx65_increments_i_chip8() {
+    #[tokio::test]
+    async fn test_fx65_increments_i_chip8() {
         let mut chip = Chip::new(1200, ChipType::CHIP8);
         chip.i = 0x500;
         chip.registers[0x0] = 1;
 
         let decoded_instruction = chip.decode(0xFF65);
-        chip.execute(decoded_instruction);
+        chip.execute(decoded_instruction).await;
 
         assert_eq!(chip.i, 0x500 + 15 + 1); // i + 1 + Vx, where Vx is 0xF
     }

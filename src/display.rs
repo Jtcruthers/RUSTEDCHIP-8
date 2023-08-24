@@ -1,5 +1,4 @@
 use macroquad::prelude::*;
-use macroquad::color::hsl_to_rgb;
 
 pub const DISPLAY_WIDTH: usize = 64;
 pub const DISPLAY_HEIGHT: usize = 32;
@@ -26,11 +25,8 @@ impl Display {
         }
     }
 
-    pub async fn clear(&mut self) {
+    pub fn clear(&mut self) {
         self.display = [false; DISPLAY_SIZE];
-        clear_background(BLACK);
-
-        next_frame().await;
     }
 
     pub fn set_pixel(&mut self, pixel_index: usize, value: bool) {
