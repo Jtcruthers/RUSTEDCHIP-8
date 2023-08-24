@@ -14,6 +14,7 @@ macroquad = "0.4.2"
 rand = "0.8.5"
 futures = "0.3"
 getrandom = { version = "0.2.2", features = ["js"]}
+async-trait = "0.1.73"
 
 [dev-dependencies]
 tokio = { version = "1.32", features = ["full"] }

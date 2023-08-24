@@ -16,12 +16,75 @@ pub fn window_conf() -> Conf {
 
 pub struct Display {
     pub display: [bool; DISPLAY_SIZE],
+    renderer: Box<dyn Renderer>,
+}
+
+#[async_trait::async_trait]
+trait Renderer {
+    async fn render(&self, display: &[bool; DISPLAY_SIZE]);
+}
+
+struct MacroquadRenderer;
+
+#[async_trait::async_trait]
+impl Renderer for MacroquadRenderer {
+    async fn render(&self, display: &[bool; DISPLAY_SIZE]) {
+        clear_background(BLACK);
+
+        for row in 0..DISPLAY_HEIGHT {
+            for column in 0..DISPLAY_WIDTH {
+                let pixel = DISPLAY_WIDTH * row + column;
+                let pixel_height = PIXEL_DIMENSION * row as f32;
+                let pixel_width = PIXEL_DIMENSION * column as f32;
+
+                let pixel_on_color = Color::new(255., 176., 0., 255.);
+                let pixel_off_color = BLACK;
+                let pixel_color = if display[pixel] == true { pixel_on_color } else { pixel_off_color };
+
+                draw_rectangle(pixel_width, pixel_height, PIXEL_DIMENSION, PIXEL_DIMENSION, pixel_color);
+            }
+        }
+
+        next_frame().await;
+    }
+}
+
+struct TuiRenderer;
+
+#[async_trait::async_trait]
+impl Renderer for TuiRenderer {
+    async fn render(&self, display: &[bool; DISPLAY_SIZE]) {
+        // Clear screen
+        print!("\x1B[2J\x1B[1;1H");
+
+        let mut str_to_print = String::new();
+        for _ in 0..DISPLAY_WIDTH {
+            str_to_print.push_str("-");
+        }
+        str_to_print.push_str("\n");
+        for row in 0..DISPLAY_HEIGHT {
+            str_to_print.push_str("|");
+            for column in 0..DISPLAY_WIDTH {
+                let pixel = DISPLAY_WIDTH * row + column;
+                let sprite = if display[pixel] == true { "X" } else { " " };
+                str_to_print.push_str(sprite);
+            }
+            str_to_print.push_str("|\n");
+        }
+        for _ in 0..DISPLAY_WIDTH {
+            str_to_print.push_str("-");
+        }
+        str_to_print.push_str("\n");
+
+        println!("{}", str_to_print);
+    }
 }
 
 impl Display {
     pub fn new() -> Self {
         Self {
-            display: [false; DISPLAY_SIZE]
+            display: [false; DISPLAY_SIZE],
+            renderer: Box::new(TuiRenderer),
         }
     }
 
@@ -40,26 +103,7 @@ impl Display {
     }
 
     pub async fn print(&self) {
-        clear_background(BLACK);
-
-        let mut str_to_print = String::new();
-
-        for row in 0..DISPLAY_HEIGHT {
-            str_to_print.push_str("|");
-            for column in 0..DISPLAY_WIDTH {
-                let pixel = DISPLAY_WIDTH * row + column;
-                let pixel_height = PIXEL_DIMENSION * row as f32;
-                let pixel_width = PIXEL_DIMENSION * column as f32;
-
-                let pixel_on_color = Color::new(255., 176., 0., 255.);
-                let pixel_off_color = BLACK;
-                let pixel_color = if self.display[pixel] == true { pixel_on_color } else { pixel_off_color };
-
-                draw_rectangle(pixel_width, pixel_height, PIXEL_DIMENSION, PIXEL_DIMENSION, pixel_color);
-            }
-        }
-
-        next_frame().await;
+        self.renderer.render(&self.display).await;
     }
 
     pub async fn draw_sprite(&mut self, x_index: usize, y_index: usize, height: u8, sprite: Vec<u8>) -> bool {
