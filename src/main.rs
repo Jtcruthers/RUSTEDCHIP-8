@@ -19,6 +19,9 @@ struct Args {
 
     #[arg(short, long, value_enum, default_value_t = ChipType::CHIP8)]
     chip_type: ChipType,
+
+    #[arg(short, long, value_enum, default_value_t = ChipType::CHIP8)]
+    render_type: ChipType,
 }
 
 #[macroquad::main(window_conf)]

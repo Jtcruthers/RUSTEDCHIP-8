@@ -14,17 +14,22 @@ pub fn window_conf() -> Conf {
     }
 }
 
+#[derive(ValueEnum, Clone, Debug)]
+pub enum ChipType {
+    GUI,
+    TUI 
+}
 pub struct Display {
     pub display: [bool; DISPLAY_SIZE],
     renderer: Box<dyn Renderer>,
 }
 
 #[async_trait::async_trait]
-trait Renderer {
+pub trait Renderer {
     async fn render(&self, display: &[bool; DISPLAY_SIZE]);
 }
 
-struct MacroquadRenderer;
+pub struct MacroquadRenderer;
 
 #[async_trait::async_trait]
 impl Renderer for MacroquadRenderer {
@@ -49,10 +54,10 @@ impl Renderer for MacroquadRenderer {
     }
 }
 
-struct TuiRenderer;
+pub struct TerminalRenderer;
 
 #[async_trait::async_trait]
-impl Renderer for TuiRenderer {
+impl Renderer for TerminalRenderer {
     async fn render(&self, display: &[bool; DISPLAY_SIZE]) {
         // Clear screen
         print!("\x1B[2J\x1B[1;1H");
@@ -84,7 +89,7 @@ impl Display {
     pub fn new() -> Self {
         Self {
             display: [false; DISPLAY_SIZE],
-            renderer: Box::new(TuiRenderer),
+            renderer: Box::new(MacroquadRenderer),
         }
     }
 
