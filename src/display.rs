@@ -164,7 +164,7 @@ mod tests {
 
     #[test]
     fn initial_display_is_64_by_32_pixels_all_empty() {
-        let display = Display::new();
+        let display = Display::new(DisplayType::Terminal);
         assert_eq!(display.display, [false; 64 * 32]);
     }
 }
