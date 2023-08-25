@@ -2,7 +2,7 @@ use rand::Rng;
 use std::time::{Duration, SystemTime};
 use clap::ValueEnum;
 use crate::font;
-use crate::display::Display;
+use crate::display::{Display, DisplayType};
 use crate::timer::Timer;
 use device_query::{DeviceQuery, DeviceState, Keycode};
 use std::process;
@@ -38,12 +38,12 @@ pub struct Chip {
 }
 
 impl Chip {
-    pub fn new(target_ips: u128, chip_type: ChipType) -> Self {
+    pub fn new(target_ips: u128, chip_type: ChipType, display_type: DisplayType) -> Self {
         let mut chip = Chip {
             memory: [0; 4096],
             stack: [0; 32],
             stack_level: 0,
-            display: Display::new(),
+            display: Display::new(display_type),
             registers: [0; 16],
             delay_timer: Timer::new(TIMER_HZ),
             sound_timer: Timer::new(TIMER_HZ),
