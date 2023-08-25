@@ -1,3 +1,4 @@
+use clap::ValueEnum;
 use macroquad::prelude::*;
 
 pub const DISPLAY_WIDTH: usize = 64;
@@ -14,21 +15,29 @@ pub fn window_conf() -> Conf {
     }
 }
 
+#[derive(ValueEnum, PartialEq, Clone, Debug)]
+pub enum DisplayType {
+    Macroquad,
+    Terminal
+}
+
 pub struct Display {
     pub display: [bool; DISPLAY_SIZE],
-    renderer: Box<dyn Renderer>,
+    display_type: DisplayType
 }
 
 #[async_trait::async_trait]
-trait Renderer {
-    async fn render(&self, display: &[bool; DISPLAY_SIZE]);
+trait MacroquadDisplay {
+    async fn render(&self);
 }
 
-struct MacroquadRenderer;
+trait TerminalDisplay {
+    fn render(&self);
+}
 
 #[async_trait::async_trait]
-impl Renderer for MacroquadRenderer {
-    async fn render(&self, display: &[bool; DISPLAY_SIZE]) {
+impl MacroquadDisplay for Display {
+    async fn render(&self) {
         clear_background(BLACK);
 
         for row in 0..DISPLAY_HEIGHT {
@@ -39,7 +48,7 @@ impl Renderer for MacroquadRenderer {
 
                 let pixel_on_color = Color::new(255., 176., 0., 255.);
                 let pixel_off_color = BLACK;
-                let pixel_color = if display[pixel] == true { pixel_on_color } else { pixel_off_color };
+                let pixel_color = if self.display[pixel] == true { pixel_on_color } else { pixel_off_color };
 
                 draw_rectangle(pixel_width, pixel_height, PIXEL_DIMENSION, PIXEL_DIMENSION, pixel_color);
             }
@@ -49,11 +58,8 @@ impl Renderer for MacroquadRenderer {
     }
 }
 
-struct TuiRenderer;
-
-#[async_trait::async_trait]
-impl Renderer for TuiRenderer {
-    async fn render(&self, display: &[bool; DISPLAY_SIZE]) {
+impl TerminalDisplay for Display {
+    fn render(&self) {
         // Clear screen
         print!("\x1B[2J\x1B[1;1H");
 
@@ -66,7 +72,7 @@ impl Renderer for TuiRenderer {
             str_to_print.push_str("|");
             for column in 0..DISPLAY_WIDTH {
                 let pixel = DISPLAY_WIDTH * row + column;
-                let sprite = if display[pixel] == true { "X" } else { " " };
+                let sprite = if self.display[pixel] == true { "X" } else { " " };
                 str_to_print.push_str(sprite);
             }
             str_to_print.push_str("|\n");
@@ -81,10 +87,10 @@ impl Renderer for TuiRenderer {
 }
 
 impl Display {
-    pub fn new() -> Self {
+    pub fn new(display_type: DisplayType) -> Self {
         Self {
             display: [false; DISPLAY_SIZE],
-            renderer: Box::new(TuiRenderer),
+            display_type
         }
     }
 
@@ -103,7 +109,11 @@ impl Display {
     }
 
     pub async fn print(&self) {
-        self.renderer.render(&self.display).await;
+        if self.display_type == DisplayType::Macroquad {
+            MacroquadDisplay::render(self).await;
+        } else {
+            TerminalDisplay::render(self);
+        }
     }
 
     pub async fn draw_sprite(&mut self, x_index: usize, y_index: usize, height: u8, sprite: Vec<u8>) -> bool {
