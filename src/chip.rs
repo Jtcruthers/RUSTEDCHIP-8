@@ -404,9 +404,9 @@ impl Chip {
     }
 
     pub fn load_rom(&mut self, rom: &Vec<u8>) {
+        self.pc = ROM_ADDR;
         for (offset, byte) in rom.iter().enumerate() {
-            self.memory[ROM_ADDR + offset] = *byte;
-            self.pc = ROM_ADDR;
+            self.memory[self.pc + offset] = *byte;
         }
     }
 }
