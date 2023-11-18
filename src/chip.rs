@@ -1130,7 +1130,6 @@ mod tests {
         assert_eq!(chip.pc, 0xABC + 0xF);
     }
 
-    #[ignore]
     #[tokio::test]
     async fn test_ex9e_skip_if_vx_key_is_pressed() {
         let mut chip = Chip::new(1200, ChipType::CHIP8, DisplayType::Terminal);
